@@ -1,0 +1,1124 @@
+<!doctype html>
+
+<html>
+<title>Graph Navigation UI/Ilses (GNU/I)</title>
+<!--
+// For layout examples, see:
+// https://codepen.io/keckelt/pen/dBOMxG
+--!>
+<!-- cytoscape, jquery --!>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.20.0/cytoscape.min.js"></script>
+<script src="https://unpkg.com/jquery@3.4.1/dist/jquery.js"></script>
+  
+<!-- cytoscape klay -->
+<script src="https://unpkg.com/klayjs@0.4.1/klay.js"></script>
+<script src="https://unpkg.com/cytoscape-klay@3.1.2/cytoscape-klay.js"></script>
+
+<script src="mod-clilinks.js"></script>
+
+Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
+<a href=# class="clilink edit" title="cli_execute('maximize adv')">arbitrary</a>
+<!--
+  Due to the current string encoding hackiness in the cli_execute_output shim, you can't use some clilinks yet.
+  For instance, "maximize adventures" will fail (it'll just print the string)
+--!>
+<!-- <a href=# class="clilink">"maximize adventures"</a> --!>
+
+<br>
+<a href=# onclick="reflow_graph()">reflow graph</a>
+<br>
+<a href=# onclick="toggle_non_root_nodes()">toggle_non_root_nodes</a>
+<br>
+<a href=# onclick="linkify_non_root_nodes()">linkify_non_root_nodes</a>
+<br>
+<a href=# onclick="odd_test_fn()">maximize adv</a>
+
+<style>
+    #cy {
+        width: 100%;
+        height: 90%;
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        z-index: -1;
+    }
+</style>
+
+<div id="cy"></div>
+<script>
+update_graph_visibility()
+
+// TODO wishlist:
+// - We can get image urls via e.g.: $monster[sausage goblin].image, for crystal ball tracking on nodes.
+//
+// TODO: Solarized colors?
+// - Mafia has is_dark_mode
+// e.g., document.body.style.backgroundColor = "#002b36";
+
+// Toggle graph display.
+function toggle_graph_display() {
+  cli_execute("set_property('gnui.enable', !to_boolean(get_property('gnui.enable')))").then(response => {
+      update_graph_visibility()
+  })
+}
+
+// TODO: Consider hiding the iframe instead of resizing, so we don't need to reflow the graph.
+function update_graph_visibility() {
+  cli_execute("get_property('gnui.enable')").then(response => {
+    if (response == 'true') {
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui').height="90%"
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui').width="100%"
+    } else {
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui').height="0%"
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui').width="0%"
+    }
+  }).then(response => reflow_graph())
+}
+
+// Example: We have to wrap things that can't be executed via ashq in cli_execute.
+// Because this is all a horrible hack.
+function odd_test_fn() {
+ cli_execute("cli_execute('maximize adv')").then(response => { console.log(response); })
+}
+
+// Helper function to hide the non-root nodes.
+var non_root_nodes_hidden = false;
+function toggle_non_root_nodes() {
+  if (non_root_nodes_hidden) {
+    console.log("DEBUG: "+non_root_nodes_hidden)
+    for (const element of cy.$('node', 'edge')) {
+      element.style({'display': 'element'})
+    }
+  } else {
+    for (const element of cy.$('node').successors()) {
+      if (!element.isEdge())
+      element.style({'display': 'none'})
+    }
+  }
+  non_root_nodes_hidden = !non_root_nodes_hidden;
+}
+
+// Helper function to enable hyperlinks in non-root nodes. These are
+// disabled by default to prevent accidental clicks, but node cleanup logic
+// hasn't been debugged yet.)
+function linkify_non_root_nodes() {
+  for (const element of cy.$('node')) {
+    linkify_node(element)
+  }
+}
+
+// Stolen from tourguide, made plain javascript. e.g. maxint -> sentinel, int -> var.
+function QuestStateConvertQuestPropertyValueToNumber(property_value) {
+	if (property_value == "") {
+		return -1;
+  }
+	if (property_value == "started") {
+		return 1;
+	}
+	if (property_value == "finished") {
+		return 999;
+	}
+	if (property_value == "step") {
+		//lazy:
+    //one revision had a bug that set questL11Worship to "step 4", so remove spaces
+		var theoretical_int = property_value.replace_string(" ", "").replace_string("step", "");
+		var step_value = theoretical_int.to_int_silent();
+		
+		result = step_value + 1;
+		
+    return (result < 0 ? 0 : result)
+	}
+  //unknown
+  console.log("Error: unknown property_value "+property_value)
+	return 0;
+}
+
+// Stolen from tourguide, added trim().
+function questPropertyPastInternalStepNumber(quest_property, number) {
+	return QuestStateConvertQuestPropertyValueToNumber(quest_property.trim()) >= number;
+}
+
+// Note: we derive the urls from the location name, e.g.:
+// ashq print(to_url($location[The Haunted Kitchen]))
+//
+// cat <logname>.txt | grep -E "^[\[][0-9]+" | cut -d " " -f 2- | awk '!x[$0]++'|less > location_list_ordered.txt
+let locations = [
+"Camp Logging Camp",
+"The Spooky Forest",
+"Guano Junction",
+"The Batrat and Ratbat Burrow",
+"The Outskirts of Cobb's Knob",
+"The Haunted Kitchen",
+"The Dark Elbow of the Woods",
+"The Dark Heart of the Woods",
+"The Defiled Niche",
+"The Dark Neck of the Woods",
+"The Haunted Billiards Room",
+"The Defiled Alcove",
+"The Hidden Temple",
+"Friar Ceremony Location",
+"Cobb's Knob Harem",
+"Throne Room",
+"The Haunted Library",
+"The Beanbat Chamber",
+"The Boss Bat's Lair",
+"The Haunted Bedroom",
+"The Shore, Inc. Travel Agency",
+"The Goatlet",
+"<Itznotyerzitz Mine>",
+"The Haunted Bathroom",
+"The Smut Orc Logging Camp",
+"Oil Peak",
+"The Typical Tavern Cellar",
+"A-Boo Peak",
+"The Defiled Nook",
+"The Defiled Cranny",
+"The Penultimate Fantasy Airship",
+"The Haunted Gallery",
+"The Black Forest",
+"Noob Cave",
+"The Dire Warren",
+// TODO: Does this need to be verge of war?
+"Hippy Camp",
+"<Rock band flyers>",
+"Sonofa Beach",
+"Twin Peak",
+"<Retrieve Yossarian's Tools>",
+"Next to that Barrel with Something Burning in it",
+"Out by that Rusted-Out Car",
+"Over Where the Old Tires Are",
+"Near an Abandoned Refrigerator",
+"<Turn in Yossarian's Tools>",
+"The Castle in the Clouds in the Sky (Basement)",
+"The Hatching Chamber",
+"The Feeding Chamber",
+"<Pantogram filthworm>",
+"The Royal Guard Chamber",
+"The Castle in the Clouds in the Sky (Ground Floor)",
+"The Copperhead Club",
+"The Haunted Ballroom",
+"The Battlefield (Frat Uniform)",
+"The Filthworm Queen's Chamber",
+"The Themthar Hills",
+"The Haunted Wine Cellar",
+"The Haunted Laundry Room",
+"The Hidden Park",
+"An Overgrown Shrine (Northwest)",
+"A Massive Ziggurat",
+"An Overgrown Shrine (Northeast)",
+"An Overgrown Shrine (Southeast)",
+"An Overgrown Shrine (Southwest)",
+"The Hidden Bowling Alley",
+"The Hidden Apartment Building",
+"The Hidden Office Building",
+"The Hidden Hospital",
+"The Daily Dungeon",
+"Haert of the Cyrpt",
+"The Arid, Extra-Dry Desert",
+"The Oasis",
+"Lair of the Ninja Snowmen",
+"A Mob of Zeppelin Protesters",
+"The Red Zeppelin",
+"The Haunted Boiler Room",
+"Summoning Chamber",
+"Mist-Shrouded Peak",
+"The Castle in the Clouds in the Sky (Top Floor)",
+"Inside the Palindome",
+"Visiting Dr. Awkward's office",
+"Whitey's Grove",
+"The Upper Chamber",
+"The Middle Chamber",
+//"The Lower Chambers (Token/Empty)",
+//"The Lower Chambers (Rubble/Bomb)",
+//"The Lower Chambers (Empty/Rubble)",
+//"The Lower Chambers (Empty/Empty/Ed's Chamber)",
+"The Lower Chambers",
+"The Hole in the Sky",
+"<Finish war>",
+"<Tower contests>",
+"<The Hedge Maze>",
+"<Tower Door>",
+//"Tower Level 1",
+//"Tower Level 2",
+//"Tower Level 3",
+//"Tower Level 4",
+//"Tower Level 5",
+"The Naughty Sorceress' Chamber",
+"<Freeing King Ralph>",
+];
+
+// Other non-location actions:
+//
+//"numberology 69",
+//"Combing (experience) Beach Head",
+//"numberology 51",
+//"Rest in your campaway tent",
+//"Cargo Cultist Shorts",
+//"Your Mushroom Garden",
+//"Combing (initiative) Beach Head",
+//"Combing (muscle) Beach Head",
+//"Combing (spooky) Beach Head",
+//"Combing (mysticality) Beach Head",
+//"Rest in your dwelling",
+//"Combing (sleaze) Beach Head",
+//"Cook 1 bottle of Chateau de Vinegar + 1 blasting soda",
+//"Smith 1 shirt kit + 1 bar skin",
+//"Cook 1 grue egg + 1 spooky mushroom",
+//"Cook 1 scrumptious reagent + 1 glass of goat's milk",
+//"Cook 1 scrumptious reagent + 1 spooky powder",
+//"lynyrd snare",
+//"Smith 1 shirt kit + 1 lynyrd skin",
+//"Cook 1 bird rib + 1 lion oil",
+//"Cook 1 wet stew + 1 stunt nuts",
+//"Combing (moxie) Beach Head",
+//"rusty hedge trimmers",
+//"Combing (familiar) Beach Head",
+
+// The stylesheet for the graph
+const style = [
+  {
+    selector: 'node',
+    style: {
+      label: 'data(id)',
+      'font-size': '0.5em',
+    }
+  },
+];
+
+// Graph layout options.
+let klaylayout = {
+  name: 'klay',
+  nodeDimensionsIncludeLabels: true, // Excludes the label when calculating node bounding boxes for the layout algorithm
+  fit: true, // Whether to fit
+  padding: 20, // Padding on fit
+  animate: false, // Whether to transition the node positions
+  animateFilter: function( node, i ){ return true; }, // Whether to animate specific nodes when animation is on; non-animated nodes immediately go to their final positions
+  animationDuration: 500, // Duration of animation in ms if enabled
+  animationEasing: undefined, // Easing of animation if enabled
+  transform: function( node, pos ){ return pos; }, // A function that applies a transform to the final node position
+  ready: undefined, // Callback on layoutready
+  stop: undefined, // Callback on layoutstop
+  klay: {
+    // Following descriptions taken from http://layout.rtsys.informatik.uni-kiel.de:9444/Providedlayout.html?algorithm=de.cau.cs.kieler.klay.layered
+    addUnnecessaryBendpoints: false, // Adds bend points even if an edge does not change direction.
+    aspectRatio: 1.2, // The aimed aspect ratio of the drawing, that is the quotient of width by height
+    borderSpacing: 10, // Minimal amount of space to be left to the border
+    compactComponents: false, // Tries to further compact components (disconnected sub-graphs).
+    crossingMinimization: 'LAYER_SWEEP', // Strategy for crossing minimization.
+    /* LAYER_SWEEP The layer sweep algorithm iterates multiple times over the layers, trying to find node orderings that minimize the number of crossings. The algorithm uses randomization to increase the odds of finding a good result. To improve its results, consider increasing the Thoroughness option, which influences the number of iterations done. The Randomization seed also influences results.
+    INTERACTIVE Orders the nodes of each layer by comparing their positions before the layout algorithm was started. The idea is that the relative order of nodes as it was before layout was applied is not changed. This of course requires valid positions for all nodes to have been set on the input graph before calling the layout algorithm. The interactive layer sweep algorithm uses the Interactive Reference Point option to determine which reference point of nodes are used to compare positions. */
+    cycleBreaking: 'GREEDY', // Strategy for cycle breaking. Cycle breaking looks for cycles in the graph and determines which edges to reverse to break the cycles. Reversed edges will end up pointing to the opposite direction of regular edges (that is, reversed edges will point left if edges usually point right).
+    /* GREEDY This algorithm reverses edges greedily. The algorithm tries to avoid edges that have the Priority property set.
+    INTERACTIVE The interactive algorithm tries to reverse edges that already pointed leftwards in the input graph. This requires node and port coordinates to have been set to sensible values.*/
+    direction: 'RIGHT', // Overall direction of edges: horizontal (right / left) or vertical (down / up)
+    /* UNDEFINED, RIGHT, LEFT, DOWN, UP */
+    edgeRouting: 'ORTHOGONAL', // Defines how edges are routed (POLYLINE, ORTHOGONAL, SPLINES)
+    edgeSpacingFactor: 0.5, // Factor by which the object spacing is multiplied to arrive at the minimal spacing between edges.
+    feedbackEdges: false, // Whether feedback edges should be highlighted by routing around the nodes.
+    fixedAlignment: 'BALANCED', // Tells the BK node placer to use a certain alignment instead of taking the optimal result.  This option should usually be left alone.
+    /* NONE Chooses the smallest layout from the four possible candidates.
+    LEFTUP Chooses the left-up candidate from the four possible candidates.
+    RIGHTUP Chooses the right-up candidate from the four possible candidates.
+    LEFTDOWN Chooses the left-down candidate from the four possible candidates.
+    RIGHTDOWN Chooses the right-down candidate from the four possible candidates.
+    BALANCED Creates a balanced layout from the four possible candidates. */
+    inLayerSpacingFactor: 1.0, // Factor by which the usual spacing is multiplied to determine the in-layer spacing between objects.
+    layoutHierarchy: true, // Whether the selected layouter should consider the full hierarchy
+    linearSegmentsDeflectionDampening: 0.3, // Dampens the movement of nodes to keep the diagram from getting too large.
+    mergeEdges: true, // Edges that have no ports are merged so they touch the connected nodes at the same points.
+    mergeHierarchyCrossingEdges: true, // If hierarchical layout is active, hierarchy-crossing edges use as few hierarchical ports as possible.
+    nodeLayering:'NETWORK_SIMPLEX', // Strategy for node layering.
+    /* NETWORK_SIMPLEX This algorithm tries to minimize the length of edges. This is the most computationally intensive algorithm. The number of iterations after which it aborts if it hasn't found a result yet can be set with the Maximal Iterations option.
+    LONGEST_PATH A very simple algorithm that distributes nodes along their longest path to a sink node.
+    INTERACTIVE Distributes the nodes into layers by comparing their positions before the layout algorithm was started. The idea is that the relative horizontal order of nodes as it was before layout was applied is not changed. This of course requires valid positions for all nodes to have been set on the input graph before calling the layout algorithm. The interactive node layering algorithm uses the Interactive Reference Point option to determine which reference point of nodes are used to compare positions. */
+    nodePlacement:'BRANDES_KOEPF', // Strategy for Node Placement
+    /* BRANDES_KOEPF Minimizes the number of edge bends at the expense of diagram size: diagrams drawn with this algorithm are usually higher than diagrams drawn with other algorithms.
+    LINEAR_SEGMENTS Computes a balanced placement.
+    INTERACTIVE Tries to keep the preset y coordinates of nodes from the original layout. For dummy nodes, a guess is made to infer their coordinates. Requires the other interactive phase implementations to have run as well.
+    SIMPLE Minimizes the area at the expense of... well, pretty much everything else. */
+    randomizationSeed: 1, // Seed used for pseudo-random number generators to control the layout algorithm; 0 means a new seed is generated
+    routeSelfLoopInside: false, // Whether a self-loop is routed around or inside its node.
+    separateConnectedComponents: true, // Whether each connected component should be processed separately
+    spacing: 20, // Overall setting for the minimal amount of space to be left between objects
+    thoroughness: 20 // How much effort should be spent to produce a nice layout..
+  },
+  priority: function( edge ){ return null; }, // Edges with a non-nil value are skipped when greedy edge cycle breaking is enabled
+};
+
+var cy = cytoscape({
+  container: document.getElementById('cy'),
+
+  boxSelectionEnabled: false,
+  autounselectify: true,
+  layout: klaylayout,
+
+  style: cytoscape.stylesheet()
+    .selector('node')
+      .css({
+        'content': 'data(name)',
+        'text-valign': 'center',
+        'color': 'white',
+        'text-outline-width': 2,
+        'text-outline-color': '#888',
+        'background-color': '#888'
+      })
+    .selector(':selected')
+      .css({
+        'background-color': 'black',
+        'line-color': 'black',
+        'target-arrow-color': 'black',
+        'source-arrow-color': 'black',
+        'text-outline-color': 'black'
+      }),
+
+  elements: {
+    // TODO: I figure I'll save the graphs as JSON and load from a file, anyway.
+    nodes: [
+      // Can put initial nodes here
+    ],
+    edges: [
+      // Can put initial edges here.
+    ]
+  },
+
+  layout: {
+    name: 'breadthfirst',
+    padding: 10
+  }
+});
+
+// Graph nodes for council visits on level-up.
+for (var i = 2; i <= 13; i++) {
+  cy.add({ data: { id: "Level " + i, name: "Level " + i, href: "council.php" } })
+  if (i > 2) {
+    cy.add({ data: { source: "Level " + (i-1), target: "Level " + i } })
+  }
+}
+
+// Level-ups require hitting the previous level
+for (var i = 0; i < locations.length; i++) {
+  cy.add({ data: {id: locations[i], name: locations[i], href: "" } })
+}
+
+function add_edge(a, b) {
+  cy.add({ data: { source: a, target: b } })
+}
+
+add_edge("Level 2", "The Spooky Forest")
+add_edge("The Spooky Forest", "The Typical Tavern Cellar")
+
+add_edge("The Spooky Forest", "The Hidden Temple")
+add_edge("Level 3", "The Typical Tavern Cellar")
+
+add_edge("Level 4", "Guano Junction")
+add_edge("Guano Junction", "The Batrat and Ratbat Burrow")
+add_edge("The Batrat and Ratbat Burrow", "The Beanbat Chamber")
+add_edge("The Beanbat Chamber", "The Boss Bat's Lair")
+add_edge("Level 5", "Cobb's Knob Harem")
+add_edge("The Outskirts of Cobb's Knob", "Cobb's Knob Harem")
+add_edge("Cobb's Knob Harem", "Throne Room")
+
+add_edge("Level 6", "The Dark Elbow of the Woods")
+add_edge("Level 6", "The Dark Heart of the Woods")
+add_edge("Level 6", "The Dark Neck of the Woods")
+add_edge("The Dark Elbow of the Woods", "Friar Ceremony Location")
+add_edge("The Dark Heart of the Woods", "Friar Ceremony Location")
+add_edge("The Dark Neck of the Woods", "Friar Ceremony Location")
+add_edge("Level 7", "The Defiled Niche")
+add_edge("Level 7", "The Defiled Alcove")
+add_edge("Level 7", "The Defiled Nook")
+add_edge("Level 7", "The Defiled Cranny")
+add_edge("The Defiled Niche", "Haert of the Cyrpt")
+add_edge("The Defiled Alcove", "Haert of the Cyrpt")
+add_edge("The Defiled Nook", "Haert of the Cyrpt")
+add_edge("The Defiled Cranny", "Haert of the Cyrpt")
+add_edge("Level 8", "The Goatlet")
+add_edge("Level 8", "<Itznotyerzitz Mine>")
+add_edge("The Goatlet", "Lair of the Ninja Snowmen")
+add_edge("<Itznotyerzitz Mine>", "Lair of the Ninja Snowmen")
+add_edge("Lair of the Ninja Snowmen", "Mist-Shrouded Peak")
+add_edge("Level 9", "The Smut Orc Logging Camp")
+add_edge("The Smut Orc Logging Camp", "Twin Peak")
+add_edge("The Smut Orc Logging Camp", "Oil Peak")
+add_edge("The Smut Orc Logging Camp", "A-Boo Peak")
+add_edge("Level 10", "The Penultimate Fantasy Airship")
+add_edge("The Beanbat Chamber", "The Penultimate Fantasy Airship")
+add_edge("The Penultimate Fantasy Airship", "The Castle in the Clouds in the Sky (Basement)")
+add_edge("The Castle in the Clouds in the Sky (Basement)", "The Castle in the Clouds in the Sky (Ground Floor)")
+add_edge("The Castle in the Clouds in the Sky (Ground Floor)", "The Castle in the Clouds in the Sky (Top Floor)")
+add_edge("The Castle in the Clouds in the Sky (Top Floor)", "The Hole in the Sky")
+add_edge("Level 11", "The Black Forest")
+add_edge("The Black Forest", "The Haunted Wine Cellar")
+add_edge("The Black Forest", "The Haunted Laundry Room")
+add_edge("The Haunted Wine Cellar", "The Haunted Boiler Room")
+add_edge("The Haunted Laundry Room", "The Haunted Boiler Room")
+add_edge("The Haunted Boiler Room", "Summoning Chamber")
+add_edge("The Black Forest", "The Copperhead Club")
+add_edge("The Black Forest", "A Mob of Zeppelin Protesters")
+add_edge("The Hidden Temple", "An Overgrown Shrine (Northwest)")
+add_edge("The Hidden Temple", "The Hidden Park")
+add_edge("The Hidden Temple", "An Overgrown Shrine (Northeast)")
+add_edge("The Hidden Temple", "An Overgrown Shrine (Southwest)")
+add_edge("The Hidden Temple", "An Overgrown Shrine (Southeast)")
+add_edge("The Black Forest", "An Overgrown Shrine (Northwest)")
+add_edge("The Black Forest", "An Overgrown Shrine (Northeast)")
+add_edge("The Black Forest", "An Overgrown Shrine (Southeast)")
+add_edge("The Black Forest", "An Overgrown Shrine (Southwest)")
+add_edge("An Overgrown Shrine (Southeast)", "The Hidden Bowling Alley")
+add_edge("An Overgrown Shrine (Southwest)", "The Hidden Hospital")
+add_edge("An Overgrown Shrine (Northwest)", "The Hidden Apartment Building")
+add_edge("An Overgrown Shrine (Northeast)", "The Hidden Office Building")
+add_edge("The Hidden Bowling Alley", "A Massive Ziggurat")
+add_edge("The Hidden Hospital", "A Massive Ziggurat")
+add_edge("The Hidden Apartment Building", "A Massive Ziggurat")
+add_edge("The Hidden Office Building", "A Massive Ziggurat")
+add_edge("Summoning Chamber", "The Upper Chamber")
+add_edge("A Massive Ziggurat", "The Upper Chamber")
+add_edge("The Copperhead Club", "Inside the Palindome")
+add_edge("A Mob of Zeppelin Protesters", "The Red Zeppelin")
+add_edge("The Red Zeppelin", "Inside the Palindome")
+add_edge("Inside the Palindome", "Whitey's Grove")
+add_edge("Whitey's Grove", "Visiting Dr. Awkward's office")
+add_edge("Visiting Dr. Awkward's office", "The Upper Chamber")
+
+add_edge("The Black Forest", "The Shore, Inc. Travel Agency")
+add_edge("The Shore, Inc. Travel Agency", "The Arid, Extra-Dry Desert")
+add_edge("The Shore, Inc. Travel Agency", "The Oasis")
+
+add_edge("The Arid, Extra-Dry Desert", "The Upper Chamber")
+add_edge("The Upper Chamber", "The Middle Chamber")
+add_edge("The Middle Chamber", "The Lower Chambers")
+
+add_edge("The Haunted Kitchen", "The Haunted Billiards Room")
+add_edge("The Haunted Billiards Room", "The Haunted Library")
+add_edge("The Haunted Library", "The Haunted Bedroom")
+add_edge("The Haunted Library", "The Haunted Bathroom")
+add_edge("The Haunted Library", "The Haunted Gallery")
+add_edge("The Haunted Bedroom", "The Haunted Ballroom")
+add_edge("The Haunted Bathroom", "The Haunted Ballroom")
+add_edge("The Haunted Gallery", "The Haunted Ballroom")
+add_edge("The Haunted Ballroom", "The Haunted Wine Cellar")
+add_edge("The Haunted Ballroom", "The Haunted Laundry Room")
+
+add_edge("Level 12", "Hippy Camp")
+add_edge("Hippy Camp", "Sonofa Beach")
+add_edge("Hippy Camp", "<Rock band flyers>")
+add_edge("<Rock band flyers>", "The Battlefield (Frat Uniform)")
+add_edge("Sonofa Beach", "The Battlefield (Frat Uniform)")
+add_edge("Hippy Camp", "The Hatching Chamber")
+add_edge("The Hatching Chamber", "The Feeding Chamber")
+add_edge("<Pantogram filthworm>", "The Royal Guard Chamber")
+add_edge("The Feeding Chamber", "The Royal Guard Chamber")
+add_edge("The Royal Guard Chamber", "The Filthworm Queen's Chamber")
+add_edge("The Filthworm Queen's Chamber", "The Battlefield (Frat Uniform)")
+
+add_edge("Hippy Camp", "<Retrieve Yossarian's Tools>")
+add_edge("<Retrieve Yossarian's Tools>", "Next to that Barrel with Something Burning in it")
+add_edge("<Retrieve Yossarian's Tools>", "Out by that Rusted-Out Car")
+add_edge("<Retrieve Yossarian's Tools>", "Over Where the Old Tires Are")
+add_edge("<Retrieve Yossarian's Tools>", "Near an Abandoned Refrigerator")
+add_edge("Next to that Barrel with Something Burning in it", "<Turn in Yossarian's Tools>")
+add_edge("Out by that Rusted-Out Car", "<Turn in Yossarian's Tools>")
+add_edge("Over Where the Old Tires Are", "<Turn in Yossarian's Tools>")
+add_edge("Near an Abandoned Refrigerator", "<Turn in Yossarian's Tools>")
+
+add_edge("<Turn in Yossarian's Tools>", "The Battlefield (Frat Uniform)")
+add_edge("The Battlefield (Frat Uniform)", "The Hatching Chamber")
+add_edge("The Battlefield (Frat Uniform)", "The Themthar Hills")
+add_edge("The Battlefield (Frat Uniform)", "<Finish war>")
+
+add_edge("<Finish war>", "<Tower contests>")
+add_edge("Level 13", "<Tower contests>")
+add_edge("<Tower contests>", "<The Hedge Maze>")
+
+add_edge("<The Hedge Maze>", "<Tower Door>")
+
+add_edge("The Daily Dungeon", "<Tower Door>")
+add_edge("The Spooky Forest", "<Tower Door>")
+add_edge("The Typical Tavern Cellar", "<Tower Door>")
+add_edge("The Boss Bat's Lair", "<Tower Door>")
+add_edge("Throne Room", "<Tower Door>")
+add_edge("Friar Ceremony Location", "<Tower Door>")
+add_edge("Haert of the Cyrpt", "<Tower Door>")
+add_edge("Mist-Shrouded Peak", "<Tower Door>")
+add_edge("Twin Peak", "<Tower Door>")
+add_edge("Oil Peak", "<Tower Door>")
+add_edge("A-Boo Peak", "<Tower Door>")
+add_edge("The Castle in the Clouds in the Sky (Top Floor)", "<Tower Door>")
+add_edge("The Hole in the Sky", "<Tower Door>")
+add_edge("The Lower Chambers", "<Tower Door>")
+
+add_edge("<Tower Door>", "The Naughty Sorceress' Chamber")
+add_edge("The Naughty Sorceress' Chamber", "<Freeing King Ralph>")
+
+// Color the level requirement nodes.
+cy.style()
+  .selector(cy.filter('[name *= "Level "]'))
+      .style('background-color', 'orange')
+  .update()
+
+function linkify_node(element) {
+  // Don't add links to "Level X" nodes or <fake nodes>
+  if (element.data('name').startsWith("Level") || element.data('name').startsWith("<")) {
+    return
+  }
+  cli_execute("to_url($location["+element.data('name')+"])").then(response => { /*console.log("Out: " + response);*/ element.data('href', response); })
+}
+
+function update_style() {
+  // Color root nodes differently.
+  for (const element of cy.$('node').roots()) {
+    element.style({'opacity': 1.0})
+    element.style({'color': 'white'})
+    element.style({'text-outline-color': 'green'})
+    element.style({'font-size': '0.5em'})
+    linkify_node(element)
+  }
+  // Make non-root nodes transparent.
+  for (const element of cy.$('node').successors()) {
+    element.style({'color': 'black'})
+    element.style({'text-outline-color': 'orange'})
+    element.style({'opacity': 0.6})
+    element.style({'font-size': '0.4em'})
+  }
+  cy.style().update()
+}
+
+function reflow_graph() {
+  // After deletions, different nodes may be root nodes.
+  update_style()
+  // Generate the new layout.
+  cy.layout(klaylayout).run()
+}
+
+reflow_graph()
+
+async function parallel_prune_graph() {
+  function delete_level_nodes(current_level) {
+    for (const element of cy.$('node[name *= "Level "]')) {
+      if (parseInt(element.data('name').substr("Level ".length)) < current_level) {
+        element.remove()
+      }
+    }
+  }
+
+  // Functions to clean up nodes when they are no longer useful.
+  await Promise.all([
+    cli_execute("item_amount($item[logging hatchet]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Camp Logging Camp"]')
+      }
+    }),
+
+    cli_execute("get_property('lastCouncilVisit')").then(response => {
+      delete_level_nodes(parseInt(response)+1)
+    }),
+    cli_execute("get_property('lastTempleUnlock') >= get_property('knownAscensions') ? get_property('questL02Larva') : 'unstarted'").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 1)) {
+        cy.remove('node[name = "The Spooky Forest"]')
+      }
+    }),
+    cli_execute("get_property('questL03Rat')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 1)) {
+        cy.remove('node[name = "The Typical Tavern Cellar"]')
+        reflow_graph();
+      }
+    }),
+    cli_execute("get_property('questL04Bat')").then(response => {
+      // TODO: Maybe we want to not delete one node for shen snakes, idk.
+      if (questPropertyPastInternalStepNumber(response, 1)) {
+        cy.remove('node[name = "Guano Junction"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Batrat and Ratbat Burrow"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 3)) {
+        cy.remove('edge[source = "The Beanbat Chamber"][target = "The Boss Bat\'s Lair"]')
+        if (cy.elements('edge[source = "The Beanbat Chamber"]').empty()) {
+          cy.remove('node[name = "The Beanbat Chamber"]')
+        }
+      }
+      if (questPropertyPastInternalStepNumber(response, 3)) {
+        cy.remove('node[name = "The Boss Bat\'s Lair"]')
+      }
+    }),
+    cli_execute("get_property('questL05Goblin')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 1)) {
+        cy.remove('node[name = "The Outskirts of Cobb\'s Knob"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "Cobb\'s Knob Harem"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 3)) {
+        cy.remove('node[name = "Throne Room"]')
+      }
+    }),
+    
+    cli_execute("item_amount($item[dodecagram]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Dark Neck of the Woods"]')
+      }
+    }),
+    cli_execute("item_amount($item[box of birthday candles]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Dark Heart of the Woods"]')
+      }
+    }),
+    cli_execute("item_amount($item[eldritch butterknife]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Dark Elbow of the Woods"]')
+      }
+    }),
+    // TODO: These progress numbers are just guesses.
+    cli_execute("get_property('questL06Friar')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 1)) {
+        cy.remove('node[name = "The Dark Neck of the Woods"]')
+        cy.remove('node[name = "The Dark Heart of the Woods"]')
+        cy.remove('node[name = "The Dark Elbow of the Woods"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "Friar Ceremony Location"]')
+      }
+    }),
+    cli_execute("get_property('cyrptAlcoveEvilness') == 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Defiled Alcove"]')
+      }
+    }),
+    cli_execute("get_property('cyrptCrannyEvilness') == 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Defiled Cranny"]')
+      }
+    }),
+    cli_execute("get_property('cyrptNicheEvilness') == 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Defiled Niche"]')
+      }
+    }),
+    cli_execute("get_property('cyrptNookEvilness') == 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Defiled Nook"]')
+      }
+    }),
+    cli_execute("get_property('questL07Cyrptic') == 'finished'").then(response => {
+      cy.remove('node[name = "Haert of the Cyrpt"]')
+    }),
+    
+    cli_execute("get_property('questL08Trapper')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Goatlet"]')
+      }
+      // TODO: This looks wrong. Are the turn-ins ordered?
+      if (questPropertyPastInternalStepNumber(response, 3)) {
+        cy.remove('node[name = "<Itznotyerzitz Mine>"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "Lair of the Ninja Snowmen"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 6)) {
+        cy.remove('node[name = "Mist-Shrouded Peak"]')
+      }
+    }),
+    
+    cli_execute("get_property('questL09Topping')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Smut Orc Logging Camp"]')
+      }
+      if (questPropertyPastInternalStepNumber(response, 999)) {
+      }
+    }),
+    cli_execute("get_property('twinPeakProgress') == 15").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Twin Peak"]')
+      }
+    }),
+    cli_execute("get_property('booPeakLit')").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "A-Boo Peak"]')
+      }
+    }),
+    cli_execute("get_property('oilPeakLit')").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Oil Peak"]')
+      }
+    }),
+    
+    // If we have the bean or the airship unlock, don't need beanbat -> airship edge.
+    cli_execute("item_amount($item[enchanted bean]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('edge[source = "The Beanbat Chamber"][target = "The Penultimate Fantasy Airship"]')
+        if (cy.elements('edge[source = "The Beanbat Chamber"]').empty()) {
+          cy.remove('node[name = "The Beanbat Chamber"]')
+        }
+      }
+    }),
+    cli_execute("get_property('questL10Garbage')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('edge[source = "The Beanbat Chamber"][target = "The Penultimate Fantasy Airship"]')
+        if (cy.elements('edge[source = "The Beanbat Chamber"]').empty()) {
+          cy.remove('node[name = "The Beanbat Chamber"]')
+        }
+      }
+    }),
+    
+    cli_execute("item_amount($item[S.O.C.K.]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Penultimate Fantasy Airship"]')
+      }
+    }),
+    
+    cli_execute("get_property('lastCastleGroundUnlock') >= get_property('knownAscensions')").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Castle in the Clouds in the Sky (Basement)"]')
+      }
+    }),
+    
+    cli_execute("get_property('lastCastleTopUnlock') >= get_property('knownAscensions')").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Castle in the Clouds in the Sky (Ground Floor)"]')
+      }
+    }),
+    
+    // It's possible to skip HitS, so all of this should be made more robust at some point.
+    // For now, assume we always finish the giants quest before unlocking the hole in the sky.
+    // Later, we should check the giant quest (questL10Garbage) is be finished.
+    //
+    // TODO: Consider deleting just the edge, instead. Then, remove the node iff it has no edge and quest is complete.
+    cli_execute("item_amount($item[steam-powered model rocketship]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Castle in the Clouds in the Sky (Top Floor)"]')
+      }
+    }),
+
+    // TODO: Level 11 quest.
+
+    //    case $location[The Copperhead Club]:
+    //        return QuestState("questL11MacGuffin").mafia_internal_step >= 3;
+    //    case $location[A mob of zeppelin protesters]:
+    //        return QuestState("questL11MacGuffin").mafia_internal_step >= 3;
+    //    case $location[The Red Zeppelin]:
+
+    cli_execute("get_property('questL11MacGuffin')").then(response => {
+      // From tour guide: "FIXME no idea, diary?"
+      if (questPropertyPastInternalStepNumber(response, 3)) {
+        cy.remove('node[name = "The Black Forest"]')
+      }
+    }),
+
+    cli_execute("item_amount($item[your father's MacGuffin diary]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Shore, Inc. Travel Agency"]')
+      }
+    }),
+
+    cli_execute("get_property('zeppelinProtestors') >= 80").then(response => {
+      // From tour guide: "also NC needs to be visited first"
+      if (response == 'true') {
+        cy.remove('node[name = "A Mob of Zeppelin Protesters"]')
+      }
+    }),
+
+    cli_execute("get_property('questL11Shen')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "The Red Zeppelin"]')
+      }
+    }),
+
+    // TODO: Add in the delay snake nodes!
+    cli_execute("get_property('questL11Ron')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "The Copperhead Club"]')
+      }
+    }),
+
+
+    cli_execute("get_property('questL11Palindome')").then(response => {
+      // From tour guide: "FIXME what step for questL11Palindome?"
+      // I assume we always do whitey's so probably 2?
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "Inside the Palindome"]')
+      }
+    }),
+
+    cli_execute("get_property('questL11Palindome')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 3)) {
+        cy.remove('node[name = "Whitey\'s Grove"]')
+      }
+    }),
+
+    // TODO: We assume this works instead of checking for the reward / derivative items. Let's see.
+    cli_execute("get_property('questL11Palindome')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "Visiting Dr. Awkward\'s office"]')
+      }
+    }),
+    
+    cli_execute("get_property('questL11Worship')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "The Hidden Temple"]')
+      }
+    }),
+    
+    cli_execute("get_property('hiddenApartmentProgress') > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "An Overgrown Shrine (Northwest)"]')
+      }
+    }),
+    cli_execute("get_property('hiddenBowlingAlleyProgress') > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "An Overgrown Shrine (Southeast)"]')
+      }
+    }),
+    cli_execute("get_property('hiddenHospitalProgress') > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "An Overgrown Shrine (Southwest)"]')
+      }
+    }),
+    cli_execute("get_property('hiddenOfficeProgress') > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "An Overgrown Shrine (Northeast)"]')
+      }
+    }),
+    
+    cli_execute("get_property('hiddenApartmentProgress') > 8").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Hidden Apartment Building"]')
+      }
+    }),
+    cli_execute("get_property('hiddenBowlingAlleyProgress') > 8").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Hidden Bowling Alley"]')
+      }
+    }),
+    cli_execute("get_property('hiddenHospitalProgress') > 8").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Hidden Hospital"]')
+      }
+    }),
+    cli_execute("get_property('hiddenOfficeProgress') > 8").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Hidden Office Building"]')
+      }
+    }),
+
+    // TODO: Can we simply check if the worship quest is finished?
+    // cli_execute("item_amount($item[[2180]ancient amulet]) > 0 || item_amount($item[[2325]Staff of Ed]) > 0 || item_amount($item[headpiece of the Staff of Ed]) > 0 || item_amount($item[Staff of Ed, almost]) > 0").then(response => {
+    cli_execute("get_property('questL11Worship') == 'finished'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "A Massive Ziggurat"]')
+        cy.remove('node[name = "The Hidden Park"]')
+      }
+    }),
+
+    cli_execute("item_amount($item[Spookyraven billiards room key]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Haunted Kitchen"]')
+      }
+    }),
+    cli_execute("item_amount($item[[7302]Spookyraven library key]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Haunted Billiards Room"]')
+      }
+    }),
+    
+    cli_execute("(get_property('lastSecondFloorUnlock') >= get_property('knownAscensions')) ? get_property('questM21Dance') : 'unstarted'").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Haunted Library"]')
+      }
+    }),
+    // If we either have the item or have opened the basement, then these nodes should be removed.
+    cli_execute("item_amount($item[Lady Spookyraven's dancing shoes]) > 0 ? 'finished' : get_property('questL11Manor')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Haunted Gallery"]')
+      }
+    }),
+    
+    cli_execute("item_amount($item[Lady Spookyraven's finest gown]) > 0 ? 'finished' : get_property('questL11Manor')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Haunted Bedroom"]')
+      }
+    }),
+    
+    cli_execute("item_amount($item[Lady Spookyraven's powder puff]) > 0 ? 'finished' : get_property('questL11Manor')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Haunted Bathroom"]')
+      }
+    }),
+
+    cli_execute("get_property('questL11Manor')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 2)) {
+        cy.remove('node[name = "The Haunted Ballroom"]')
+      }
+    }),
+
+    cli_execute("(item_amount($item[bottle of Chateau de Vinegar]) > 0 || item_amount($item[unstable fulminate]) > 0 || item_amount($item[wine bomb]) > 0) ? 'finished' : get_property('questL11Manor')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "The Haunted Wine Cellar"]')
+      }
+    }),
+
+    cli_execute("(item_amount($item[blasting soda]) > 0 || item_amount($item[unstable fulminate]) > 0 || item_amount($item[wine bomb]) > 0) ? 'finished' : get_property('questL11Manor')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "The Haunted Laundry Room"]')
+      }
+    }),
+
+    cli_execute("item_amount($item[wine bomb]) > 0 ? 'finished' : get_property('questL11Manor')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 4)) {
+        cy.remove('node[name = "The Haunted Boiler Room"]')
+      }
+    }),
+
+    // If we have the eye of ed or derivatives, then we're good.
+    cli_execute("item_amount($item[[2286]Eye of Ed]) > 0 || item_amount($item[[2325]Staff of Ed]) > 0 || item_amount($item[headpiece of the Staff of Ed]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Summoning Chamber"]')
+      }
+    }),
+ 
+    cli_execute("get_property('desertExploration') >= 100").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Arid, Extra-Dry Desert"]')
+        cy.remove('node[name = "The Oasis"]')
+      }
+    }),
+
+    cli_execute("get_property('middleChamberUnlock')").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Upper Chamber"]')
+      }
+    }),
+    cli_execute("get_property('lowerChamberUnlock')").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Middle Chamber"]')
+      }
+    }),
+    // If we have the eye of ed or derivatives, then we're good.
+    cli_execute("item_amount($item[[2334]Holy MacGuffin]) > 0 || get_property('questL11MacGuffin') == 'finished'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Lower Chambers"]')
+      }
+    }),
+    
+
+    cli_execute("item_amount($item[molybdenum magnet]) > 0 || get_property('sidequestJunkyardCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "<Retrieve Yossarian\'s Tools>"]')
+      }
+    }),
+    cli_execute("item_amount($item[molybdenum hammer]) > 0 || get_property('sidequestJunkyardCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Next to that Barrel with Something Burning in it"]')
+      }
+    }),
+    cli_execute("item_amount($item[molybdenum crescent wrench]) > 0 || get_property('sidequestJunkyardCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Over Where the Old Tires Are"]')
+      }
+    }),
+    cli_execute("item_amount($item[molybdenum pliers]) > 0 || get_property('sidequestJunkyardCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Near an Abandoned Refrigerator"]')
+      }
+    }),
+    cli_execute("item_amount($item[molybdenum screwdriver]) > 0 || get_property('sidequestJunkyardCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Out by that Rusted-Out Car"]')
+      }
+    }),
+    cli_execute("get_property('sidequestJunkyardCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "<Turn in Yossarian\'s Tools>"]')
+      }
+    }),
+
+
+    cli_execute("get_property('warProgress') != 'unstarted'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Hippy Camp"]')
+      }
+    }),
+    // TODO: Can we checkpoint -> outfit frat war -> immediately turn in -> checkpoint outfit?
+    // Same thing for unlocking the quests, there's no reason to have to do this manually.
+    cli_execute("get_property('sidequestLighthouseCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "Sonofa Beach"]')
+      }
+    }),
+
+    cli_execute("get_property('sidequestArenaCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "<Rock band flyers>"]')
+      }
+    }), 
+
+    cli_execute("get_property('sidequestOrchardCompleted') != 'none' || have_effect($effect[Filthworm Larva Stench]) > 0 || have_effect($effect[Filthworm Drone Stench]) > 0 || have_effect($effect[Filthworm Guard Stench]) > 0 || item_amount($item[filthworm hatchling scent gland]) > 0 || item_amount($item[filthworm drone scent gland]) > 0 || item_amount($item[filthworm royal guard scent gland]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Hatching Chamber"]')
+      }
+    }),
+
+    cli_execute("get_property('sidequestOrchardCompleted') != 'none' || have_effect($effect[Filthworm Drone Stench]) > 0 || have_effect($effect[Filthworm Guard Stench]) > 0 || item_amount($item[filthworm drone scent gland]) > 0 || item_amount($item[filthworm royal guard scent gland]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Feeding Chamber"]')
+        cy.remove('node[name = "<Pantogram filthworm>"]')
+      }
+    }),
+
+    cli_execute("get_property('sidequestOrchardCompleted') != 'none' || have_effect($effect[Filthworm Guard Stench]) > 0 || item_amount($item[filthworm royal guard scent gland]) > 0").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Royal Guard Chamber"]')
+      }
+    }),
+
+    cli_execute("get_property('sidequestOrchardCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Filthworm Queen\'s Chamber"]')
+      }
+    }),
+
+    cli_execute("get_property('hippiesDefeated')").then(response => {
+      if (parseInt(response) >= 64) {
+        cy.remove('edge[source = "The Battlefield (Frat Uniform)"][target = "The Hatching Chamber"]')
+      }
+      if (parseInt(response) >= 192) {
+        cy.remove('edge[source = "The Battlefield (Frat Uniform)"][target = "The Themthar Hills"]')
+      }
+      if (parseInt(response) >= 1000) {
+        cy.remove('node[name = "The Battlefield (Frat Uniform)"]')
+      }
+    }),
+
+    // TODO: Mouseover/Tap to show currentNunneryMeat or something like that.
+    cli_execute("get_property('sidequestNunsCompleted') != 'none'").then(response => {
+      if (response == 'true') {
+        cy.remove('node[name = "The Themthar Hills"]')
+      }
+    }),
+    
+    // TODO: Level 13 quest.
+    // "some string".contains_string("str")
+    //cli_execute("get_property('nsTowerDoorKeysUsed')").then(response => {
+    //  boolean [string] known_key_names = $strings[Boris's key,Jarlsberg's key,Sneaky Pete's key,Richard's star key];
+    //  ...
+    //}),
+  ])
+  // After all the deletions, update the node styles and graph layout.
+  reflow_graph();
+}
+
+parallel_prune_graph()
+
+// TODO: Show some context on tap -- delay left, next orb prediction, want item/ML/..., etc.
+// Maybe set the node's image to the zone, or perhaps the orb monster currently predicted there
+//cy.on('tap', 'node', function() {
+//  console.log("Tapped");
+//});
+cy.on('dbltap', 'node', function() {
+  if (this.data('href')) {
+    window.location.href = this.data('href');
+  }
+});
+</script>
+</html>
+
