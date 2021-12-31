@@ -4,9 +4,10 @@ A new interface for your KoL quests!
 ![Screenshot](capture.png)
 
 ## Installation
-For now, copy `*.html *.ash, *.js` files into your `relay/` directory.
 
-(I'll rearrange for `svn checkout` installation when this repo is more mature.)
+In the graphical CLI, run:
+
+`svn checkout https://github.com/Ilses/gnui/branches/main/src`
 
 ### Dependencies
 - We might depend on tourguide behavior? Hopefully not?
