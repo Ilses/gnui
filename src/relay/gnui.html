@@ -16,22 +16,18 @@
 
 <script src="mod-clilinks.js"></script>
 
-Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
-<a href=# class="clilink edit" title="cli_execute('maximize adv')">arbitrary</a>
+Debug commands: <a href=# onclick="reflow_graph()">reflow graph</a>, <a href=# onclick="toggle_non_root_nodes()">toggle_non_root_nodes</a>, <a href=# onclick="linkify_non_root_nodes()">linkify_non_root_nodes</a>, <a href=# onclick="odd_test_fn()">test maximizing adv</a>
 <!--
-  Due to the current string encoding hackiness in the cli_execute_output shim, you can't use some clilinks yet.
-  For instance, "maximize adventures" will fail (it'll just print the string)
+  Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
+  <a href=# class="clilink edit" title="cli_execute('maximize adv')">arbitrary</a>
+
+  Due to the current string encoding hackiness in the cli_execute_output shim, you can't use some clilinks as-is yet.
+  For instance, "maximize adventures" needs to be wrapped in cli_execute
 --!>
 <!-- <a href=# class="clilink">"maximize adventures"</a> --!>
+<br>
 
 <br>
-<a href=# onclick="reflow_graph()">reflow graph</a>
-<br>
-<a href=# onclick="toggle_non_root_nodes()">toggle_non_root_nodes</a>
-<br>
-<a href=# onclick="linkify_non_root_nodes()">linkify_non_root_nodes</a>
-<br>
-<a href=# onclick="odd_test_fn()">maximize adv</a>
 
 <style>
     #cy {
@@ -48,8 +44,35 @@ Note that nodes can also support using some clilinks, e.g.: <a href=# class="cli
 <script>
 update_graph_visibility()
 
-// TODO wishlist:
-// - We can get image urls via e.g.: $monster[sausage goblin].image, for crystal ball tracking on nodes.
+function display_crystal_ball_predictions() {
+  // Clear the old image url for all nodes.
+  cy.$('node').style('background-image','')
+  cli_execute("get_property('crystalBallPredictions')").then(response => {
+    // Parse -> list of <turncount>:<zone>:<prediction>|...|...|...
+    for (const element of response.split("|")) {
+      const Prediction = element.split(":")
+      const Zone = Prediction[1]
+      const Monster = Prediction[2]
+      // Get image urls for predicted monsters and attach to the node.
+      cli_execute("$monster["+Monster+"].image").then(response => {
+        console.log("Zone: " + Zone + " image will be /images/adventureimages/"+response)
+        cy.$("node[name='"+Zone+"']").style('background-image',"http://127.0.0.1:60080/images/adventureimages/"+response)
+      })
+    }
+  })
+}
+
+// Demo
+function set_demo_crystal_ball_pref() {
+   cli_execute("cli_execute('set crystalBallPredictions=0:The Dire Warren:fluffy bunny|0:Noob Cave:sausage goblin')").then(response => {
+   }).then(response => display_crystal_ball_predictions())
+}
+// Demo
+function clear_crystal_ball_pref() {
+   cli_execute("cli_execute('set crystalBallPredictions=')").then(response => {
+   }).then(response => display_crystal_ball_predictions())
+}
+
 //
 // TODO: Solarized colors?
 // - Mafia has is_dark_mode
@@ -360,7 +383,8 @@ var cy = cytoscape({
         'color': 'white',
         'text-outline-width': 2,
         'text-outline-color': '#888',
-        'background-color': '#888'
+        'background-fit': 'cover',
+        'background-color': '#888',
       })
     .selector(':selected')
       .css({
@@ -368,7 +392,7 @@ var cy = cytoscape({
         'line-color': 'black',
         'target-arrow-color': 'black',
         'source-arrow-color': 'black',
-        'text-outline-color': 'black'
+        'text-outline-color': 'black',
       }),
 
   elements: {
