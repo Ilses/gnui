@@ -13,14 +13,15 @@ In the graphical CLI, run:
 - We might depend on tourguide behavior? Hopefully not?
 
 - For now, a modified version of clilinks is included as a hacky JS --> Mafia real-time interface.
+ - Thus, if you have clilinks installed normally, this may conflict with it.
 
 ## Usage
 
 - Scroll to zoom, tap + drag to pan.
 
-- Nodes can be dragged around (but nothing is persistent, yet).
+- Nodes can be dragged around (but changes won't persist between reflows).
 
-- Double-click a root node (green text) to navigate to the corresponding location.
+- Double-click a green root node to navigate to the corresponding location.
 
 - Fake nodes are denoted with angle bracket names, e.g.: <name>. These do not currently have hyperlinks.
 
@@ -29,9 +30,7 @@ In the graphical CLI, run:
 
 ## Known issues
   - Main quest support is only mostly-complete. There will be bugs. Currently, this is a mostly-functional demo.
-  - We're not saving node state. Thus, changes to node positions will not be saved.
-  - Yes, the color-coding needs to change / exist. Let me know if you have suggestions.
-    - A Solarized dark mode would probably be nice
+  - We're not saving any node state. Thus, changes to node positions will not be saved.
   
 ## Wishlist
   - Nodes can have images, e.g. zone image, orb predicted monster, etc.

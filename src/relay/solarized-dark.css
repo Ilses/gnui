@@ -174,14 +174,14 @@ h6 {
   font-weight: 700;
 }
 html {
-  background-color: #073642;
+  background-color: #002b36;
   color: #839496;
 }
 body {
-  background-color: #002b36;
+  background-color: #073642;
 }
 code {
-  background-color: #073642;
+  background-color: #002b36;
   padding: 2px;
 }
 a {
@@ -233,6 +233,13 @@ h6 {
   background-color: #073642;
   color: #d33682;
 }
+
+::selection {
+  background: #073642;
+  color: #93a1a1;
+  text-shadow: none;
+}
+
 .todo,
 .next,
 .done {

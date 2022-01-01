@@ -2,7 +2,8 @@
 
 <html>
 <head>
-<link rel="stylesheet" id="solarized-css" href="solarized.css" disabled=true>
+<link rel="stylesheet" id="solarized-light-css" href="solarized-light.css" disabled=true>
+<link rel="stylesheet" id="solarized-dark-css" href="solarized-dark.css" disabled=true>
 <title>Graph Navigation UI/Ilses (GNU/I)</title>
 <!--
 // For layout examples, see:
@@ -19,8 +20,11 @@
 <script src="mod-clilinks.js"></script>
 </head>
 
-
-Debug commands: <a href=# onclick="reflow_graph()">reflow graph</a>, <a href=# onclick="toggle_non_root_nodes()">toggle_non_root_nodes</a>, <a href=# onclick="linkify_non_root_nodes()">linkify_non_root_nodes</a>, <a href=# onclick="odd_test_fn()">test maximizing adv</a>, <a href=# onclick="toggle_solarized_pref()">toggle_solarized_pref</a>.
+Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a>,
+<a href=# onclick="toggle_non_root_nodes(); return false">toggle_non_root_nodes</a>,
+<a href=# onclick="linkify_non_root_nodes(); return false">linkify_non_root_nodes</a>,
+<a href=# onclick="odd_test_fn(); return false">test maximizing adv</a>,
+<a href=# onclick="toggle_dark_mode_pref(); return false">toggle_dark_mode_pref</a>.
 
 <!--
   Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
@@ -30,7 +34,6 @@ Debug commands: <a href=# onclick="reflow_graph()">reflow graph</a>, <a href=# o
   For instance, "maximize adventures" needs to be wrapped in cli_execute
 --!>
 <!-- <a href=# class="clilink">"maximize adventures"</a> --!>
-<br>
 
 <br>
 
@@ -48,29 +51,30 @@ Debug commands: <a href=# onclick="reflow_graph()">reflow graph</a>, <a href=# o
 <div id="cy"></div>
 <script>
 
-document.bgColor="#fdf6e3"
-
 update_graph_visibility()
 
-// TODO: Make the cytoscape node style respect solarized, too.
-// - Mafia has is_dark_mode
+// TODO: Mafia has is_dark_mode, is there a relay equivalent?
 function set_solarized_stylesheet(response) {
-  if (response=='false') {
-    document.querySelector("#solarized-css").removeAttribute('disabled');
+  if (response == 'true') {
+    document.querySelector("#solarized-light-css").setAttribute('disabled', true);
+    document.querySelector("#solarized-dark-css").removeAttribute('disabled');
+    cy.$('node').data('class', 'dark')
   } else {
-    document.querySelector("#solarized-css").setAttribute('disabled', true);
+    document.querySelector("#solarized-dark-css").setAttribute('disabled', true);
+    document.querySelector("#solarized-light-css").removeAttribute('disabled');
+    cy.$('node').data('class', 'light')
   }
 }
 
 // Toggle graph display.
-function toggle_solarized_pref() {
-  cli_execute("set_property('gnui.solarized', !to_boolean(get_property('gnui.solarized')))").then(response => {
+function toggle_dark_mode_pref() {
+  cli_execute("set_property('gnui.dark', !to_boolean(get_property('gnui.dark')))").then(response => {
     maybe_use_stylesheet()
   })
 }
 
 function maybe_use_stylesheet() {
-  cli_execute("get_property('gnui.solarized')").then(response => {
+  cli_execute("get_property('gnui.dark')").then(response => {
     set_solarized_stylesheet(response)
   })
 }
@@ -78,7 +82,7 @@ function maybe_use_stylesheet() {
 
 function display_crystal_ball_predictions() {
   // Clear the old image url for all nodes.
-  cy.$('node').style('background-image','').style('shape','circle')
+  cy.$('node').style('background-image','').style('shape','ellipse')
   cli_execute("get_property('crystalBallPredictions')").then(response => {
     // Parse -> list of <turncount>:<zone>:<prediction>|...|...|...
     for (const element of response.split("|")) {
@@ -401,39 +405,66 @@ var cy = cytoscape({
     .selector('node')
       .css({
         'content': 'data(name)',
+        'font-weight': 'bold',
         'text-valign': 'top',
-        'color': 'white',
-        'text-outline-width': '.08em',
-        'text-outline-color': '#888',
+//        'color': 'white',
+//        'text-outline-width': '.08em',
+//        'text-outline-color': '#888',
         'background-fit': 'cover',
-        'background-color': '#888',
-        'border-color': '#000',
+//        'background-color': '#888',
+//        'border-color': '#000',
         'border-width': 3,
         'text-wrap': 'wrap',
         'text-max-width': '110px',
         'text-background-opacity': 0,
         'text-border-opacity': 0,
+        // Non-root nodes will be slightly transparent
+        'opacity': 0.6,
       })
     .selector('edge')
       .css({
         'arrow-scale': "1.3",
         'curve-style': "bezier",
-        'line-color': "rgb(241,97,246)",
+        'line-color': "#b58900",
         'line-fill': "solid",
         'line-height': "1",
-        'opacity': "0.8",
-        'target-arrow-color': "rgb(255,77,77)",
+        'opacity': "0.5",
+        'target-arrow-color': "#b58900",
         'target-arrow-fill': "filled",
         'target-arrow-shape': "triangle",
       })
-        
     .selector(':selected')
       .css({
-        'background-color': 'black',
-        'line-color': 'black',
-        'target-arrow-color': 'black',
-        'source-arrow-color': 'black',
-        'text-outline-color': 'black',
+//        'background-color': 'black',
+//        'line-color': 'black',
+//        'target-arrow-color': 'black',
+//        'source-arrow-color': 'black',
+//        'text-outline-color': 'black',
+      })
+    .selector('node[class="dark"]')
+      .css({
+        'color': '#839496',
+        'background-color': '#073642',
+        'border-color': '#93a1a1',
+      })
+    .selector('node[class="light"]')
+      .css({
+        'color': '#657b83',
+        'background-color': '#eee8d5',
+        'border-color': '#586e75',
+      })
+    // Color root nodes differently.
+    .selector('node[[indegree = 0]]')
+      .css({
+        'opacity': 1.0,
+        'color': '#859900',
+        'border-color': '#6c71c4',
+        'background-color': '#859900',
+      })
+    // Color the level requirement nodes.
+    .selector('node[type="level"]')
+      .css({
+        'background-color': '#cb4b16'
       }),
 
   elements: {
@@ -454,13 +485,14 @@ var cy = cytoscape({
 
 // Graph nodes for council visits on level-up.
 for (var i = 2; i <= 13; i++) {
-  cy.add({ data: { id: "Level " + i, name: "Level " + i, href: "council.php" } })
+  cy.add({ data: { id: "Level " + i, name: "Level " + i, href: "council.php", type: 'level' } })
+  // Level-ups require hitting the previous level
   if (i > 2) {
     cy.add({ data: { source: "Level " + (i-1), target: "Level " + i } })
   }
 }
 
-// Level-ups require hitting the previous level
+// Add the big list of locations to the graph.
 for (var i = 0; i < locations.length; i++) {
   cy.add({ data: {id: locations[i], name: locations[i], href: "" } })
 }
@@ -616,12 +648,6 @@ add_edge("The Lower Chambers", "<Tower Door>")
 add_edge("<Tower Door>", "The Naughty Sorceress' Chamber")
 add_edge("The Naughty Sorceress' Chamber", "<Freeing King Ralph>")
 
-// Color the level requirement nodes.
-cy.style()
-  .selector(cy.filter('[name *= "Level "]'))
-      .style('background-color', 'orange')
-  .update()
-
 function linkify_node(element) {
   // Don't add links to "Level X" nodes or <fake nodes>
   if (element.data('name').startsWith("Level") || element.data('name').startsWith("<")) {
@@ -631,24 +657,18 @@ function linkify_node(element) {
 }
 
 function update_style() {
-  // Color root nodes differently.
+  // Root nodes get a link.
   for (const element of cy.$('node').roots()) {
-    element.style({'opacity': 1.0})
-    element.style({'color': '#b58900'})
     element.style({'font-size': '0.8em'})
-    element.style({'text-outline-color': 'black'})
-    element.style({'text-outline-width': '0.03em'})
-    element.style({'background-color': '#888'})
     linkify_node(element)
   }
   // Make non-root nodes transparent.
   for (const element of cy.$('node').successors()) {
-    element.style({'color': 'black'})
-    element.style({'opacity': 0.7})
+//    element.style({'color': 'black'})
     element.style({'font-size': '0.8em'})
-    element.style({'text-outline-color': '#eee8d5'})
-    element.style({'text-outline-width': '0.08em'})
-    element.style({'background-color': 'red'})
+//    element.style({'text-outline-color': '#eee8d5'})
+//    element.style({'text-outline-width': '0.08em'})
+//    element.style({'background-color': 'red'})
   }
   cy.style().update()
 }
@@ -814,7 +834,9 @@ async function parallel_prune_graph() {
       }
     }),
     
-    // If we have the bean or the airship unlock, don't need beanbat -> airship edge.
+
+    // TODO: Probably clean up this logic with the degree functions @ https://js.cytoscape.org/#node.degree
+    // If we have the bean or the airship unlock, don't need beanbat to airship edge.
     cli_execute("item_amount($item[enchanted bean]) > 0").then(response => {
       if (response == 'true') {
         cy.remove('edge[source = "The Beanbat Chamber"][target = "The Penultimate Fantasy Airship"]')
