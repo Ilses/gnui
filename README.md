@@ -23,7 +23,7 @@ In the graphical CLI, run:
 
 - Double-click a green root node to navigate to the corresponding location.
 
-- Fake nodes are denoted with angle bracket names, e.g.: <name>. These do not currently have hyperlinks.
+- Fake nodes are denoted with angle bracket names, e.g.: \<name\>. These do not currently have hyperlinks.
 
 - Mafia preferences are scraped to determine which nodes are no longer useful.
   - However, the current implementation is incomplete and likely to be buggy.
