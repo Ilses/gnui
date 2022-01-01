@@ -1,6 +1,8 @@
 <!doctype html>
 
 <html>
+<head>
+<link rel="stylesheet" id="solarized-css" href="solarized.css" disabled=true>
 <title>Graph Navigation UI/Ilses (GNU/I)</title>
 <!--
 // For layout examples, see:
@@ -15,8 +17,11 @@
 <script src="https://unpkg.com/cytoscape-klay@3.1.2/cytoscape-klay.js"></script>
 
 <script src="mod-clilinks.js"></script>
+</head>
 
-Debug commands: <a href=# onclick="reflow_graph()">reflow graph</a>, <a href=# onclick="toggle_non_root_nodes()">toggle_non_root_nodes</a>, <a href=# onclick="linkify_non_root_nodes()">linkify_non_root_nodes</a>, <a href=# onclick="odd_test_fn()">test maximizing adv</a>
+
+Debug commands: <a href=# onclick="reflow_graph()">reflow graph</a>, <a href=# onclick="toggle_non_root_nodes()">toggle_non_root_nodes</a>, <a href=# onclick="linkify_non_root_nodes()">linkify_non_root_nodes</a>, <a href=# onclick="odd_test_fn()">test maximizing adv</a>, <a href=# onclick="toggle_solarized_pref()">toggle_solarized_pref</a>.
+
 <!--
   Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
   <a href=# class="clilink edit" title="cli_execute('maximize adv')">arbitrary</a>
@@ -33,20 +38,47 @@ Debug commands: <a href=# onclick="reflow_graph()">reflow graph</a>, <a href=# o
     #cy {
         width: 100%;
         height: 90%;
-        position: absolute;
-        top: 0px;
-        left: 0px;
         z-index: -1;
+        position: absolute;
+        top: 50px;
+        left: 0px;
     }
 </style>
 
 <div id="cy"></div>
 <script>
+
+document.bgColor="#fdf6e3"
+
 update_graph_visibility()
+
+// TODO: Make the cytoscape node style respect solarized, too.
+// - Mafia has is_dark_mode
+function set_solarized_stylesheet(response) {
+  if (response=='false') {
+    document.querySelector("#solarized-css").removeAttribute('disabled');
+  } else {
+    document.querySelector("#solarized-css").setAttribute('disabled', true);
+  }
+}
+
+// Toggle graph display.
+function toggle_solarized_pref() {
+  cli_execute("set_property('gnui.solarized', !to_boolean(get_property('gnui.solarized')))").then(response => {
+    maybe_use_stylesheet()
+  })
+}
+
+function maybe_use_stylesheet() {
+  cli_execute("get_property('gnui.solarized')").then(response => {
+    set_solarized_stylesheet(response)
+  })
+}
+
 
 function display_crystal_ball_predictions() {
   // Clear the old image url for all nodes.
-  cy.$('node').style('background-image','')
+  cy.$('node').style('background-image','').style('shape','circle')
   cli_execute("get_property('crystalBallPredictions')").then(response => {
     // Parse -> list of <turncount>:<zone>:<prediction>|...|...|...
     for (const element of response.split("|")) {
@@ -55,8 +87,8 @@ function display_crystal_ball_predictions() {
       const Monster = Prediction[2]
       // Get image urls for predicted monsters and attach to the node.
       cli_execute("$monster["+Monster+"].image").then(response => {
-        console.log("Zone: " + Zone + " image will be /images/adventureimages/"+response)
-        cy.$("node[name='"+Zone+"']").style('background-image',"http://127.0.0.1:60080/images/adventureimages/"+response)
+        // console.log("Zone: " + Zone + " image will be /images/adventureimages/"+response)
+        cy.$("node[name='"+Zone+"']").style('background-image',"http://127.0.0.1:60080/images/adventureimages/"+response).style('shape','square')
       })
     }
   })
@@ -72,11 +104,6 @@ function clear_crystal_ball_pref() {
    cli_execute("cli_execute('set crystalBallPredictions=')").then(response => {
    }).then(response => display_crystal_ball_predictions())
 }
-
-//
-// TODO: Solarized colors?
-// - Mafia has is_dark_mode
-// e.g., document.body.style.backgroundColor = "#002b36";
 
 // Toggle graph display.
 function toggle_graph_display() {
@@ -108,7 +135,7 @@ function odd_test_fn() {
 var non_root_nodes_hidden = false;
 function toggle_non_root_nodes() {
   if (non_root_nodes_hidden) {
-    console.log("DEBUG: "+non_root_nodes_hidden)
+    // console.log("DEBUG: "+non_root_nodes_hidden)
     for (const element of cy.$('node', 'edge')) {
       element.style({'display': 'element'})
     }
@@ -297,36 +324,29 @@ let locations = [
 //"rusty hedge trimmers",
 //"Combing (familiar) Beach Head",
 
-// The stylesheet for the graph
-const style = [
-  {
-    selector: 'node',
-    style: {
-      label: 'data(id)',
-      'font-size': '0.5em',
-    }
-  },
-];
-
 // Graph layout options.
 let klaylayout = {
   name: 'klay',
-  nodeDimensionsIncludeLabels: true, // Excludes the label when calculating node bounding boxes for the layout algorithm
+  nodeDimensionsIncludeLabels: true, // Boolean which changes whether label dimensions are included when calculating node dimensions
   fit: true, // Whether to fit
   padding: 20, // Padding on fit
   animate: false, // Whether to transition the node positions
-  animateFilter: function( node, i ){ return true; }, // Whether to animate specific nodes when animation is on; non-animated nodes immediately go to their final positions
+  animateFilter: function animateFilter(node, i) {
+    return true;
+  }, // Whether to animate specific nodes when animation is on; non-animated nodes immediately go to their final positions
   animationDuration: 500, // Duration of animation in ms if enabled
   animationEasing: undefined, // Easing of animation if enabled
-  transform: function( node, pos ){ return pos; }, // A function that applies a transform to the final node position
+  transform: function transform(node, pos) {
+    return pos;
+  }, // A function that applies a transform to the final node position
   ready: undefined, // Callback on layoutready
   stop: undefined, // Callback on layoutstop
   klay: {
     // Following descriptions taken from http://layout.rtsys.informatik.uni-kiel.de:9444/Providedlayout.html?algorithm=de.cau.cs.kieler.klay.layered
     addUnnecessaryBendpoints: false, // Adds bend points even if an edge does not change direction.
-    aspectRatio: 1.2, // The aimed aspect ratio of the drawing, that is the quotient of width by height
-    borderSpacing: 10, // Minimal amount of space to be left to the border
-    compactComponents: false, // Tries to further compact components (disconnected sub-graphs).
+    aspectRatio: 2.3, // The aimed aspect ratio of the drawing, that is the quotient of width by height
+    borderSpacing: 20, // Minimal amount of space to be left to the border
+    compactComponents: true, // Tries to further compact components (disconnected sub-graphs).
     crossingMinimization: 'LAYER_SWEEP', // Strategy for crossing minimization.
     /* LAYER_SWEEP The layer sweep algorithm iterates multiple times over the layers, trying to find node orderings that minimize the number of crossings. The algorithm uses randomization to increase the odds of finding a good result. To improve its results, consider increasing the Thoroughness option, which influences the number of iterations done. The Randomization seed also influences results.
     INTERACTIVE Orders the nodes of each layer by comparing their positions before the layout algorithm was started. The idea is that the relative order of nodes as it was before layout was applied is not changed. This of course requires valid positions for all nodes to have been set on the input graph before calling the layout algorithm. The interactive layer sweep algorithm uses the Interactive Reference Point option to determine which reference point of nodes are used to compare positions. */
@@ -336,9 +356,9 @@ let klaylayout = {
     direction: 'RIGHT', // Overall direction of edges: horizontal (right / left) or vertical (down / up)
     /* UNDEFINED, RIGHT, LEFT, DOWN, UP */
     edgeRouting: 'ORTHOGONAL', // Defines how edges are routed (POLYLINE, ORTHOGONAL, SPLINES)
-    edgeSpacingFactor: 0.5, // Factor by which the object spacing is multiplied to arrive at the minimal spacing between edges.
+    edgeSpacingFactor: 0.8, // Factor by which the object spacing is multiplied to arrive at the minimal spacing between edges.
     feedbackEdges: false, // Whether feedback edges should be highlighted by routing around the nodes.
-    fixedAlignment: 'BALANCED', // Tells the BK node placer to use a certain alignment instead of taking the optimal result.  This option should usually be left alone.
+    fixedAlignment: 'NONE', // Tells the BK node placer to use a certain alignment instead of taking the optimal result.  This option should usually be left alone.
     /* NONE Chooses the smallest layout from the four possible candidates.
     LEFTUP Chooses the left-up candidate from the four possible candidates.
     RIGHTUP Chooses the right-up candidate from the four possible candidates.
@@ -346,15 +366,15 @@ let klaylayout = {
     RIGHTDOWN Chooses the right-down candidate from the four possible candidates.
     BALANCED Creates a balanced layout from the four possible candidates. */
     inLayerSpacingFactor: 1.0, // Factor by which the usual spacing is multiplied to determine the in-layer spacing between objects.
-    layoutHierarchy: true, // Whether the selected layouter should consider the full hierarchy
+    layoutHierarchy: false, // Whether the selected layouter should consider the full hierarchy
     linearSegmentsDeflectionDampening: 0.3, // Dampens the movement of nodes to keep the diagram from getting too large.
-    mergeEdges: true, // Edges that have no ports are merged so they touch the connected nodes at the same points.
+    mergeEdges: false, // Edges that have no ports are merged so they touch the connected nodes at the same points.
     mergeHierarchyCrossingEdges: true, // If hierarchical layout is active, hierarchy-crossing edges use as few hierarchical ports as possible.
-    nodeLayering:'NETWORK_SIMPLEX', // Strategy for node layering.
+    nodeLayering: 'NETWORK_SIMPLEX', // Strategy for node layering.
     /* NETWORK_SIMPLEX This algorithm tries to minimize the length of edges. This is the most computationally intensive algorithm. The number of iterations after which it aborts if it hasn't found a result yet can be set with the Maximal Iterations option.
     LONGEST_PATH A very simple algorithm that distributes nodes along their longest path to a sink node.
     INTERACTIVE Distributes the nodes into layers by comparing their positions before the layout algorithm was started. The idea is that the relative horizontal order of nodes as it was before layout was applied is not changed. This of course requires valid positions for all nodes to have been set on the input graph before calling the layout algorithm. The interactive node layering algorithm uses the Interactive Reference Point option to determine which reference point of nodes are used to compare positions. */
-    nodePlacement:'BRANDES_KOEPF', // Strategy for Node Placement
+    nodePlacement: 'BRANDES_KOEPF', // Strategy for Node Placement
     /* BRANDES_KOEPF Minimizes the number of edge bends at the expense of diagram size: diagrams drawn with this algorithm are usually higher than diagrams drawn with other algorithms.
     LINEAR_SEGMENTS Computes a balanced placement.
     INTERACTIVE Tries to keep the preset y coordinates of nodes from the original layout. For dummy nodes, a guess is made to infer their coordinates. Requires the other interactive phase implementations to have run as well.
@@ -363,9 +383,11 @@ let klaylayout = {
     routeSelfLoopInside: false, // Whether a self-loop is routed around or inside its node.
     separateConnectedComponents: true, // Whether each connected component should be processed separately
     spacing: 20, // Overall setting for the minimal amount of space to be left between objects
-    thoroughness: 20 // How much effort should be spent to produce a nice layout..
+    thoroughness: 30 // How much effort should be spent to produce a nice layout..
   },
-  priority: function( edge ){ return null; }, // Edges with a non-nil value are skipped when greedy edge cycle breaking is enabled
+  priority: function priority(edge) {
+    return null;
+  } // Edges with a non-nil value are skipped when geedy edge cycle breaking is enabled
 };
 
 var cy = cytoscape({
@@ -379,13 +401,32 @@ var cy = cytoscape({
     .selector('node')
       .css({
         'content': 'data(name)',
-        'text-valign': 'center',
+        'text-valign': 'top',
         'color': 'white',
-        'text-outline-width': 2,
+        'text-outline-width': '.08em',
         'text-outline-color': '#888',
         'background-fit': 'cover',
         'background-color': '#888',
+        'border-color': '#000',
+        'border-width': 3,
+        'text-wrap': 'wrap',
+        'text-max-width': '110px',
+        'text-background-opacity': 0,
+        'text-border-opacity': 0,
       })
+    .selector('edge')
+      .css({
+        'arrow-scale': "1.3",
+        'curve-style': "bezier",
+        'line-color': "rgb(241,97,246)",
+        'line-fill': "solid",
+        'line-height': "1",
+        'opacity': "0.8",
+        'target-arrow-color': "rgb(255,77,77)",
+        'target-arrow-fill': "filled",
+        'target-arrow-shape': "triangle",
+      })
+        
     .selector(':selected')
       .css({
         'background-color': 'black',
@@ -593,17 +634,21 @@ function update_style() {
   // Color root nodes differently.
   for (const element of cy.$('node').roots()) {
     element.style({'opacity': 1.0})
-    element.style({'color': 'white'})
-    element.style({'text-outline-color': 'green'})
-    element.style({'font-size': '0.5em'})
+    element.style({'color': '#b58900'})
+    element.style({'font-size': '0.8em'})
+    element.style({'text-outline-color': 'black'})
+    element.style({'text-outline-width': '0.03em'})
+    element.style({'background-color': '#888'})
     linkify_node(element)
   }
   // Make non-root nodes transparent.
   for (const element of cy.$('node').successors()) {
     element.style({'color': 'black'})
-    element.style({'text-outline-color': 'orange'})
-    element.style({'opacity': 0.6})
-    element.style({'font-size': '0.4em'})
+    element.style({'opacity': 0.7})
+    element.style({'font-size': '0.8em'})
+    element.style({'text-outline-color': '#eee8d5'})
+    element.style({'text-outline-width': '0.08em'})
+    element.style({'background-color': 'red'})
   }
   cy.style().update()
 }
@@ -613,6 +658,8 @@ function reflow_graph() {
   update_style()
   // Generate the new layout.
   cy.layout(klaylayout).run()
+  display_crystal_ball_predictions()
+  maybe_use_stylesheet()
 }
 
 reflow_graph()
