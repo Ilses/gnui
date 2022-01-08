@@ -126,7 +126,7 @@ function display_crystal_ball_predictions() {
   // Workaround -- we can't handle empty responses. TODO fix this in the clilinks code.
   cli_execute("get_property('crystalBallPredictions') == ''? 'none' : get_property('crystalBallPredictions')").then(response => {
     // Parse -> list of <turncount>:<zone>:<prediction>|...|...|...
-    if (response = "none") return;
+    if (response == "none") return;
     for (const element of response.split("|")) {
       const Prediction = element.split(":")
       const Zone = Prediction[1]
