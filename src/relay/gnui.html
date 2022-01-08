@@ -56,13 +56,16 @@ update_graph_visibility()
 
 // Apply our style choices everywhere (except ChiT).
 function global_apply_style(link) {
-  // TODO: Dark mode could also invert images. Make this a pref?
+  // TODO: This chat support is a total hack.
+  window.parent.parent.frames['chatpane'].document.getElementsByTagName('link')[1].href = link
   for (var i = 0; i < window.parent.parent.frames.length; i++) {
     // Blacklist the ChiT pane, since it uses a custom style that we don't want to break.
     if (window.parent.parent.frames[i].name == 'charpane') {
       continue;
     }
-    window.parent.parent.frames[i].$('link[rel=stylesheet]').each(function () { this.href = link })
+    if (window.parent.parent.frames[i].$ != undefined) {
+      window.parent.parent.frames[i].$('link[rel=stylesheet]').each(function () { this.href = link })
+    }
   }
 }
 
@@ -74,7 +77,9 @@ function global_invert_images(images_inverted) {
     if (window.parent.parent.frames[i].name == 'charpane') {
       continue;
     }
-    window.parent.parent.frames[i].$('img').css('filter', 'invert('+val+')')
+    if (window.parent.parent.frames[i].$ != undefined) {
+      window.parent.parent.frames[i].$('img').css('filter', 'invert('+val+')')
+    }
   }
   // TODO: Cytoscape nodes don't seem to support style filters?
   //cy.$('node').style('filter', 'invert('+val+')')
@@ -1019,22 +1024,22 @@ async function parallel_prune_graph() {
       }
     }),
     
-    cli_execute("get_property('hiddenApartmentProgress') > 8").then(response => {
+    cli_execute("get_property('hiddenApartmentProgress') >= 8").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Hidden Apartment Building"]')
       }
     }),
-    cli_execute("get_property('hiddenBowlingAlleyProgress') > 8").then(response => {
+    cli_execute("get_property('hiddenBowlingAlleyProgress') >= 8").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Hidden Bowling Alley"]')
       }
     }),
-    cli_execute("get_property('hiddenHospitalProgress') > 8").then(response => {
+    cli_execute("get_property('hiddenHospitalProgress') >= 8").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Hidden Hospital"]')
       }
     }),
-    cli_execute("get_property('hiddenOfficeProgress') > 8").then(response => {
+    cli_execute("get_property('hiddenOfficeProgress') >= 8").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Hidden Office Building"]')
       }
