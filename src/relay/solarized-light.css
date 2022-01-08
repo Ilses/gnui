@@ -179,6 +179,12 @@ html {
   background-color: #fdf6e3;
   color: #657b83;
 }
+#fixedawesome {
+  background-color: #eee8d5;
+}
+button {
+  background-color: #eee8d5;
+}
 body {
   background-color: #eee8d5;
 }
