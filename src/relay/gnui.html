@@ -22,6 +22,7 @@
 
 Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a>,
 <a href=# onclick="toggle_non_root_nodes(); return false">toggle_non_root_nodes</a>,
+<a href=# onclick="delete_non_root_nodes(); return false">delete_non_root_nodes</a>,
 <a href=# onclick="linkify_non_root_nodes(); return false">linkify_non_root_nodes</a>,
 <a href=# onclick="odd_test_fn(); return false">test maximizing adv</a>,
 <a href=# onclick="toggle_dark_mode_pref(); return false">toggle_dark_mode_pref</a>.
@@ -38,14 +39,14 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 <br>
 
 <style>
-    #cy {
-        width: 100%;
-        height: 90%;
-        z-index: -1;
-        position: absolute;
-        top: 50px;
-        left: 0px;
-    }
+   #cy {
+    width: 100%;
+    height: 90%;
+    z-index: -1;
+    position: absolute;
+    top: 50px;
+    left: 0px;
+  }
 </style>
 
 <div id="cy"></div>
@@ -53,16 +54,47 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 
 update_graph_visibility()
 
+// Apply our style choices everywhere (except ChiT).
+function global_apply_style(link) {
+  // TODO: Dark mode could also invert images. Make this a pref?
+  for (var i = 0; i < window.parent.parent.frames.length; i++) {
+    // Blacklist the ChiT pane, since it uses a custom style that we don't want to break.
+    if (window.parent.parent.frames[i].name == 'charpane') {
+      continue;
+    }
+    window.parent.parent.frames[i].$('link[rel=stylesheet]').each(function () { this.href = link })
+  }
+}
+
+// Invert images everywhere
+function global_invert_images(images_inverted) {
+  const val = images_inverted? 1 : 0
+  for (var i = 0; i < window.parent.parent.frames.length; i++) {
+    // Blacklist the ChiT pane, since it uses a custom style that we don't want to break.
+    if (window.parent.parent.frames[i].name == 'charpane') {
+      continue;
+    }
+    window.parent.parent.frames[i].$('img').css('filter', 'invert('+val+')')
+  }
+  // TODO: Cytoscape nodes don't seem to support style filters?
+  //cy.$('node').style('filter', 'invert('+val+')')
+  images_inverted = !images_inverted
+}
+
 // TODO: Mafia has is_dark_mode, is there a relay equivalent?
 function set_solarized_stylesheet(response) {
   if (response == 'true') {
     document.querySelector("#solarized-light-css").setAttribute('disabled', true);
     document.querySelector("#solarized-dark-css").removeAttribute('disabled');
+    global_apply_style("solarized-dark.css")
     cy.$('node').data('class', 'dark')
+    global_invert_images(true)
   } else {
     document.querySelector("#solarized-dark-css").setAttribute('disabled', true);
     document.querySelector("#solarized-light-css").removeAttribute('disabled');
+    global_apply_style("solarized-light.css")
     cy.$('node').data('class', 'light')
+    global_invert_images(false)
   }
 }
 
@@ -139,17 +171,19 @@ function odd_test_fn() {
 var non_root_nodes_hidden = false;
 function toggle_non_root_nodes() {
   if (non_root_nodes_hidden) {
-    // console.log("DEBUG: "+non_root_nodes_hidden)
-    for (const element of cy.$('node', 'edge')) {
-      element.style({'display': 'element'})
-    }
+    cy.$('node, edge').style('display','element')
   } else {
     for (const element of cy.$('node').successors()) {
-      if (!element.isEdge())
       element.style({'display': 'none'})
     }
   }
   non_root_nodes_hidden = !non_root_nodes_hidden;
+}
+
+// Helper function to delete the non-root nodes.
+// The reflow algorithm doesn't perfectly account for hidden elements
+function delete_non_root_nodes() {
+  cy.remove('node[[indegree > 0]]')
 }
 
 // Helper function to enable hyperlinks in non-root nodes. These are
@@ -163,33 +197,33 @@ function linkify_non_root_nodes() {
 
 // Stolen from tourguide, made plain javascript. e.g. maxint -> sentinel, int -> var.
 function QuestStateConvertQuestPropertyValueToNumber(property_value) {
-	if (property_value == "") {
-		return -1;
+  if (property_value == "") {
+    return -1;
   }
-	if (property_value == "started") {
-		return 1;
-	}
-	if (property_value == "finished") {
-		return 999;
-	}
-	if (property_value == "step") {
-		//lazy:
+  if (property_value == "started") {
+    return 1;
+  }
+  if (property_value == "finished") {
+    return 999;
+  }
+  if (property_value == "step") {
+    //lazy:
     //one revision had a bug that set questL11Worship to "step 4", so remove spaces
-		var theoretical_int = property_value.replace_string(" ", "").replace_string("step", "");
-		var step_value = theoretical_int.to_int_silent();
-		
-		result = step_value + 1;
-		
+    var theoretical_int = property_value.replace_string(" ", "").replace_string("step", "");
+    var step_value = theoretical_int.to_int_silent();
+    
+    result = step_value + 1;
+    
     return (result < 0 ? 0 : result)
-	}
+  }
   //unknown
   console.log("Error: unknown property_value "+property_value)
-	return 0;
+  return 0;
 }
 
 // Stolen from tourguide, added trim().
 function questPropertyPastInternalStepNumber(quest_property, number) {
-	return QuestStateConvertQuestPropertyValueToNumber(quest_property.trim()) >= number;
+  return QuestStateConvertQuestPropertyValueToNumber(quest_property.trim()) >= number;
 }
 
 // Note: we derive the urls from the location name, e.g.:
@@ -397,6 +431,7 @@ let klaylayout = {
 var cy = cytoscape({
   container: document.getElementById('cy'),
 
+  wheelSensitivity: 0.4,
   boxSelectionEnabled: false,
   autounselectify: true,
   layout: klaylayout,
