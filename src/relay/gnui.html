@@ -37,7 +37,7 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 <!-- <a href=# class="clilink">"maximize adventures"</a> --!>
 
 <br>
-
+<body>
 <style>
    #cy {
     width: 100%;
@@ -831,13 +831,24 @@ async function parallel_prune_graph() {
     }),
     
     cli_execute("get_property('questL08Trapper')").then(response => {
-      if (questPropertyPastInternalStepNumber(response, 2)) {
+      if (questPropertyPastInternalStepNumber(response, 1)) {
         cy.remove('node[name = "The Goatlet"]')
       }
-      // TODO: This looks wrong. Are the turn-ins ordered?
-      if (questPropertyPastInternalStepNumber(response, 3)) {
+      // Also remove node if we have the necessary items
+      cli_execute("item_amount($item[goat cheese]) >= 3").then(response => {
+        if (response) {
+          cy.remove('node[name = "The Goatlet"]')
+        }
+      })
+      if (questPropertyPastInternalStepNumber(response, 1)) {
         cy.remove('node[name = "<Itznotyerzitz Mine>"]')
       }
+      // Also remove node if we have the necessary items
+      cli_execute("get_property('trapperOre') != '' && item_amount(get_property('trapperOre').to_item()) >= 3").then(response => {
+        if (response) {
+          cy.remove('node[name = "<Itznotyerzitz Mine>"]')
+        }
+      })
       if (questPropertyPastInternalStepNumber(response, 4)) {
         cy.remove('node[name = "Lair of the Ninja Snowmen"]')
       }
@@ -1248,5 +1259,6 @@ cy.on('dbltap', 'node', function() {
   }
 });
 </script>
+</body>
 </html>
 
