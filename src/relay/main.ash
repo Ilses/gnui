@@ -6,7 +6,7 @@ buffer modifyPage(buffer source) {
   source.replace_string('<body', '<br>Crystal ball background demo: <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.set_demo_crystal_ball_pref()">Set orb preference</a> <b>or</b> <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.clear_crystal_ball_pref()">clear orb preference</a>\n<body');
 
   // Add the iframe with all the logic.
-  source.replace_string('<body', '\n<iframe id="gnui", src="gnui.html", width="100%", height="90%"></iframe>\n<body');
+  source.replace_string('<body', '\n<center><iframe id="gnui", src="gnui.html", width="100%", height="90%"></iframe></center>\n<body');
 
   return source;
 }
