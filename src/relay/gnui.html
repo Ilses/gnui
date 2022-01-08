@@ -1078,20 +1078,20 @@ async function parallel_prune_graph() {
       }
     }),
     // If we either have the item or have opened the basement, then these nodes should be removed.
-    cli_execute("item_amount($item[Lady Spookyraven's dancing shoes]) > 0 ? 'finished' : get_property('questL11Manor')").then(response => {
-      if (questPropertyPastInternalStepNumber(response, 2)) {
+    cli_execute("item_amount($item[Lady Spookyraven's dancing shoes]) > 0 ? 'finished' : get_property('questM21Dance')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 3)) {
         cy.remove('node[name = "The Haunted Gallery"]')
       }
     }),
     
-    cli_execute("item_amount($item[Lady Spookyraven's finest gown]) > 0 ? 'finished' : get_property('questL11Manor')").then(response => {
-      if (questPropertyPastInternalStepNumber(response, 2)) {
+    cli_execute("item_amount($item[Lady Spookyraven's finest gown]) > 0 ? 'finished' : get_property('questM21Dance')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 3)) {
         cy.remove('node[name = "The Haunted Bedroom"]')
       }
     }),
     
-    cli_execute("item_amount($item[Lady Spookyraven's powder puff]) > 0 ? 'finished' : get_property('questL11Manor')").then(response => {
-      if (questPropertyPastInternalStepNumber(response, 2)) {
+    cli_execute("item_amount($item[Lady Spookyraven's powder puff]) > 0 ? 'finished' : get_property('questM21Dance')").then(response => {
+      if (questPropertyPastInternalStepNumber(response, 3)) {
         cy.remove('node[name = "The Haunted Bathroom"]')
       }
     }),
