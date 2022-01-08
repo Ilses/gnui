@@ -123,8 +123,10 @@ function maybe_use_stylesheet() {
 function display_crystal_ball_predictions() {
   // Clear the old image url for all nodes.
   cy.$('node').style('background-image','').style('shape','ellipse')
-  cli_execute("get_property('crystalBallPredictions')").then(response => {
+  // Workaround -- we can't handle empty responses. TODO fix this in the clilinks code.
+  cli_execute("get_property('crystalBallPredictions') == ''? 'none' : get_property('crystalBallPredictions')").then(response => {
     // Parse -> list of <turncount>:<zone>:<prediction>|...|...|...
+    if (response = "none") return;
     for (const element of response.split("|")) {
       const Prediction = element.split(":")
       const Zone = Prediction[1]
@@ -208,17 +210,19 @@ function QuestStateConvertQuestPropertyValueToNumber(property_value) {
   if (property_value == "") {
     return -1;
   }
+  if (property_value == "unstarted") {
+    return 0;
+  }
   if (property_value == "started") {
     return 1;
   }
   if (property_value == "finished") {
     return 999;
   }
-  if (property_value == "step") {
+  if (property_value.startsWith("step")) {
     //lazy:
     //one revision had a bug that set questL11Worship to "step 4", so remove spaces
-    var theoretical_int = property_value.replace_string(" ", "").replace_string("step", "");
-    var step_value = theoretical_int.to_int_silent();
+    var step_value = parseInt(property_value.replace(" ", "").replace("step", ""));
     
     result = step_value + 1;
     
