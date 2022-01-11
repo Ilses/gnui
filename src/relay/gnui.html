@@ -27,6 +27,7 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 <a href=# onclick="odd_test_fn(); return false">test maximizing adv</a>,
 <a href=# onclick="toggle_dark_mode_pref(); return false">toggle dark pref</a>.
 <a href=# onclick="toggle_auto_delete_non_root_pref(); return false">toggle auto_delete_non_root pref</a>.
+<a href=# onclick="i_am_a_horrible_person(); return false">sketchtastic update gnui button</a>.
 
 <!--
   Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
@@ -105,6 +106,11 @@ function set_solarized_stylesheet(response) {
     cy.$('node').data('class', 'light')
     global_invert_images(false)
   }
+}
+
+function i_am_a_horrible_person() {
+  // svn update seems to not actually update, and I am too lazy to figure it out right now
+  cli_execute("svn delete Ilses-gnui; svn checkout https://github.com/Ilses/gnui/branches/main/src")
 }
 
 // Preference handling
