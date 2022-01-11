@@ -25,7 +25,8 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 <a href=# onclick="delete_non_root_nodes(); return false">delete_non_root_nodes</a>,
 <a href=# onclick="linkify_non_root_nodes(); return false">linkify_non_root_nodes</a>,
 <a href=# onclick="odd_test_fn(); return false">test maximizing adv</a>,
-<a href=# onclick="toggle_dark_mode_pref(); return false">toggle_dark_mode_pref</a>.
+<a href=# onclick="toggle_dark_mode_pref(); return false">toggle dark pref</a>.
+<a href=# onclick="toggle_auto_delete_non_root_pref(); return false">toggle auto_delete_non_root pref</a>.
 
 <!--
   Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
@@ -106,12 +107,18 @@ function set_solarized_stylesheet(response) {
   }
 }
 
-// Toggle graph display.
+// Preference handling
 function toggle_dark_mode_pref() {
   cli_execute("set_property('gnui.dark', !to_boolean(get_property('gnui.dark')))").then(response => {
     maybe_use_stylesheet()
   })
 }
+function toggle_auto_delete_non_root_pref() {
+  cli_execute("set_property('gnui.auto_delete_non_root', !to_boolean(get_property('gnui.auto_delete_non_root')))").then(response => {
+    reflow_graph()
+  })
+}
+
 
 function maybe_use_stylesheet() {
   cli_execute("get_property('gnui.dark')").then(response => {
@@ -721,6 +728,11 @@ function update_style() {
 }
 
 function reflow_graph() {
+  cli_execute("to_boolean(get_property('gnui.auto_delete_non_root'))").then(response => {
+    if (response == 'true') {
+      delete_non_root_nodes()
+    }
+  })
   // After deletions, different nodes may be root nodes.
   update_style()
   // Generate the new layout.
@@ -728,8 +740,6 @@ function reflow_graph() {
   display_crystal_ball_predictions()
   maybe_use_stylesheet()
 }
-
-reflow_graph()
 
 async function parallel_prune_graph() {
   function delete_level_nodes(current_level) {
@@ -1259,6 +1269,8 @@ async function parallel_prune_graph() {
 }
 
 parallel_prune_graph()
+// TODO: Not sure why we need 2 of these, fix it later.
+reflow_graph()
 
 // TODO: Show some context on tap -- delay left, next orb prediction, want item/ML/..., etc.
 // Maybe set the node's image to the zone, or perhaps the orb monster currently predicted there

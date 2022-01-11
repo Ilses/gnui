@@ -15,6 +15,9 @@ void main() {
   if(!property_exists("gnui.enable")) {
     set_property("gnui.enable", true);
   }
+  if(!property_exists("gnui.auto_delete_non_root")) {
+    set_property("gnui.auto_delete_non_root", false);
+  }
   // TODO: Consider tying to Mafia's is_dark_mode instead of a separate pref?
   if(!property_exists("gnui.dark")) {
     set_property("gnui.dark", false);
