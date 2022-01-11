@@ -110,7 +110,7 @@ function set_solarized_stylesheet(response) {
 
 function i_am_a_horrible_person() {
   // svn update seems to not actually update, and I am too lazy to figure it out right now
-  cli_execute("svn delete Ilses-gnui; svn checkout https://github.com/Ilses/gnui/branches/main/src")
+  cli_execute("cli_execute('svn delete Ilses-gnui; svn checkout https://github.com/Ilses/gnui/branches/main/src')")
 }
 
 // Preference handling
