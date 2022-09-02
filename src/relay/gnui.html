@@ -10,16 +10,17 @@
 // https://codepen.io/keckelt/pen/dBOMxG
 --!>
 <!-- cytoscape, jquery --!>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.20.0/cytoscape.min.js"></script>
-<script src="https://unpkg.com/jquery@3.4.1/dist/jquery.js"></script>
+<script src="https://unpkg.com/cytoscape"></script>
+<script src="https://unpkg.com/jquery"></script>
   
 <!-- cytoscape klay -->
-<script src="https://unpkg.com/klayjs@0.4.1/klay.js"></script>
-<script src="https://unpkg.com/cytoscape-klay@3.1.2/cytoscape-klay.js"></script>
+<script src="https://unpkg.com/klayjs"></script>
+<script src="https://unpkg.com/cytoscape-klay"></script>
 
 <script src="mod-clilinks.js"></script>
 </head>
 
+<div id="gnui-debug" hidden>
 Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a>,
 <a href=# onclick="toggle_non_root_nodes(); return false">toggle_non_root_nodes</a>,
 <a href=# onclick="delete_non_root_nodes(); return false">delete_non_root_nodes</a>,
@@ -29,6 +30,7 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 <a href=# onclick="toggle_auto_tourguide_pref(); return false">toggle auto_tourguide_pref</a>.
 <a href=# onclick="toggle_auto_delete_non_root_pref(); return false">toggle auto_delete_non_root pref</a>.
 <a href=# onclick="i_am_a_horrible_person(); return false">sketchtastic update gnui button</a>.
+</div>
 
 <!--
   Note that nodes can also support using some clilinks, e.g.: <a href=# class="clilink">print(my_level())</a>.
@@ -52,10 +54,16 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
   }
 </style>
 
-<div id="cy"></div>
+<div id="cy" hidden></div>
 <script>
 
-update_graph_visibility()
+// If we hit the map icon but are still in a combat/noncom, buggy formatting happens. Check to avoid that.
+var is_main_page = $(window.parent.document.getElementsByTagName('td')).filter('[bgcolor="blue"]').text() === "The Kingdom of Loathing"
+if (is_main_page) {
+  console.log($('div[id="gnui-debug"').attr('hidden', false))
+  $(document.getElementById('cy')).attr('hidden', false)
+  update_graph_visibility()
+}
 
 // Apply our style choices everywhere (except ChiT and guide).
 var tourguide_found = false
@@ -109,19 +117,23 @@ function global_invert_images(images_inverted) {
   //cy.$('node').style('filter', 'invert('+val+')')
   images_inverted = !images_inverted
 }
-
+ 
 // TODO: Mafia has is_dark_mode, is there a relay equivalent?
 function set_solarized_stylesheet(response) {
   if (response == 'true') {
     document.querySelector("#solarized-light-css").setAttribute('disabled', true);
     document.querySelector("#solarized-dark-css").removeAttribute('disabled');
-    global_apply_style("solarized-dark.css")
+    if (is_main_page) {
+      global_apply_style("solarized-dark.css")
+    }
     cy.$('node').data('class', 'dark')
     global_invert_images(true)
   } else {
     document.querySelector("#solarized-dark-css").setAttribute('disabled', true);
     document.querySelector("#solarized-light-css").removeAttribute('disabled');
-    global_apply_style("solarized-light.css")
+    if (is_main_page) {
+      global_apply_style("solarized-light.css")
+    }
     cy.$('node').data('class', 'light')
     global_invert_images(false)
   }
@@ -198,6 +210,9 @@ function toggle_graph_display() {
 var graph_constructed = false;
 // TODO: Consider hiding the iframe instead of resizing, so we don't need to reflow the graph.
 function update_graph_visibility() {
+  if (!is_main_page) {
+    return
+  }
   cli_execute("get_property('gnui.enable')").then(response => {
     if (response == 'true') {
       if (!graph_constructed) {
