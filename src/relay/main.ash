@@ -1,10 +1,27 @@
 buffer modifyPage(buffer source) {
   // Add a toggle for our interface to the world map page.
-  source.replace_string('<body', '<b>Super pre-alpha version.</b> Ping <b>Ilses#9123</b> on the ASS discord or send a PR for any issues. <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_graph_display()">toggle graph</a>\n<body');
+  source.replace_string('<body', '\
+  <div id="gnui-text" style="display: block;"><center>\
+    <table width="95%" cellspacing="0" cellpadding="0"><tbody> <tr>\
+        <td style="padding: 5px; border: 1px solid white;"><center>\
+          <table><tbody>\
+            <tr>\
+              <td>\
+                <center>\
+                  <b>Super pre-alpha version.</b> Ping <b>Ilses#9123</b> on the ASS discord or send a PR for any issues.\
+                  <br><a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_graph_display()">toggle graph</a>\
+                  <!--<br>Crystal ball background demo: <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.set_demo_crystal_ball_pref()">Set orb preference</a> <b>or</b> <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.clear_crystal_ball_pref()">clear orb preference</a>!-->\
+                </center>\
+              </td>\
+            </tr>\
+          </tbody></table>\
+        </center></td>\
+      </tr>\
+    </tbody>\
+  </table>\
+  </center></div>\
+  \n<body');
   
-  // Some helpful commands.
-  source.replace_string('<body', '<br>Crystal ball background demo: <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.set_demo_crystal_ball_pref()">Set orb preference</a> <b>or</b> <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.clear_crystal_ball_pref()">clear orb preference</a>\n<body');
-
   // Add the iframe with all the logic.
   source.replace_string('<body', '\n<center><iframe id="gnui", src="gnui.html", width="100%", height="90%"></iframe></center>\n<body');
 
