@@ -26,6 +26,7 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 <a href=# onclick="linkify_non_root_nodes(); return false">linkify_non_root_nodes</a>,
 <a href=# onclick="odd_test_fn(); return false">test maximizing adv</a>,
 <a href=# onclick="toggle_dark_mode_pref(); return false">toggle dark pref</a>.
+<a href=# onclick="toggle_auto_tourguide_pref(); return false">toggle auto_tourguide_pref</a>.
 <a href=# onclick="toggle_auto_delete_non_root_pref(); return false">toggle auto_delete_non_root pref</a>.
 <a href=# onclick="i_am_a_horrible_person(); return false">sketchtastic update gnui button</a>.
 
@@ -56,22 +57,40 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 
 update_graph_visibility()
 
-// Apply our style choices everywhere (except ChiT).
+// Apply our style choices everywhere (except ChiT and guide).
+var tourguide_found = false
 function global_apply_style(link) {
   // TODO: This chat support is a total hack.
   if (window.parent.parent.frames['chatpane'] != undefined) {
     window.parent.parent.frames['chatpane'].document.getElementsByTagName('link')[1].href = link
   }
-  // TODO: I'm not touching Guide.
   for (var i = 0; i < window.parent.parent.frames.length; i++) {
     // Blacklist the ChiT pane, since it uses a custom style that we don't want to break.
     if (window.parent.parent.frames[i].name == 'charpane') {
+      continue;
+    }
+    // Also don't touch tourguide.
+    if (window.parent.parent.frames[i].name == 'Guide Frame') {
+      tourguide_found = true;
       continue;
     }
     if (window.parent.parent.frames[i].$ != undefined) {
       window.parent.parent.frames[i].$('link[rel=stylesheet]').each(function () { this.href = link })
     }
   }
+  // Automatically open guide
+  maybe_open_tourguide()
+}
+
+function maybe_open_tourguide() {
+  cli_execute("get_property('gnui.auto_open_tourguide')").then(response => {
+    if (response == 'true') {
+      if (!tourguide_found) {
+        tourguide_found = true
+        top.mainpane.location="relay_Guide.ash?relay=true"
+      }
+    }
+  })
 }
 
 // Invert images everywhere
@@ -122,6 +141,11 @@ function toggle_dark_mode_pref() {
 function toggle_auto_delete_non_root_pref() {
   cli_execute("set_property('gnui.auto_delete_non_root', !to_boolean(get_property('gnui.auto_delete_non_root')))").then(response => {
     reflow_graph()
+  })
+}
+function toggle_auto_tourguide_pref() {
+  cli_execute("set_property('gnui.auto_open_tourguide', !to_boolean(get_property('gnui.auto_open_tourguide')))").then(response => {
+    maybe_open_tourguide()
   })
 }
 
