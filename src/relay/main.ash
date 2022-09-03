@@ -24,7 +24,7 @@ buffer modifyPage(buffer source) {
   \n<body');
   
   // Add the iframe with all the logic.
-  source.replace_string('<body', '\n<center><iframe id="gnui", src="gnui.html", width="100%", height="90%"></iframe></center>\n<body');
+  source.replace_string('<body', '\n<center><iframe id="gnui", src="gnui.html", width="95%", height="80%" hidden=true></iframe></center>\n<body');
 
   return source;
 }

@@ -90,7 +90,6 @@ $.ajax({
 // If we hit the map icon but are still in a combat/noncom, buggy formatting happens. Check to avoid that.
 var is_main_page = $(window.parent.document.getElementsByTagName('td')).filter('[bgcolor="blue"]').text() === "The Kingdom of Loathing"
 if (is_main_page) {
-  $('div[id="gnui-debug"').attr('hidden', false)
   $(document.getElementById('cy')).attr('hidden', false)
   update_graph_visibility()
 }
@@ -233,7 +232,7 @@ function clear_crystal_ball_pref() {
 // Toggle graph display.
 function toggle_graph_display() {
   cli_execute("set_property('gnui.enable', !to_boolean(get_property('gnui.enable')))").then(response => {
-      update_graph_visibility()
+    update_graph_visibility()
   })
 }
 
@@ -246,19 +245,13 @@ function update_graph_visibility() {
   cli_execute("get_property('gnui.enable')").then(response => {
     if (response == 'true') {
       if (!graph_constructed) {
-        construct_graph()
-        parallel_prune_graph()
-        // TODO: Not sure why we need 2 of these, fix it later.
-        reflow_graph()
-        graph_constructed = true;
+        construct_graph().then(() => { parallel_prune_graph(); graph_constructed = true; })
       }
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui').height="90%"
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui').width="95%"
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui').hidden=false
     } else {
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui').height="0%"
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui').width="0%"
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui').hidden=true
     }
-  }).then(response => reflow_graph())
+  }).then(response => { $('div[id="gnui-debug"').attr('hidden', false); reflow_graph() })
 }
 
 // Example: We have to wrap things that can't be executed via ashq in cli_execute.
@@ -633,7 +626,7 @@ function add_edge(a, b) {
   cy.add({ data: { source: a, target: b } })
 }
 
-function construct_graph() {
+async function construct_graph() {
   // Add the big list of locations to the graph.
   for (var i = 0; i < locations.length; i++) {
     cy.add({ data: {id: locations[i], name: locations[i], href: "" } })
