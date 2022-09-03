@@ -8,8 +8,9 @@ buffer modifyPage(buffer source) {
             <tr>\
               <td>\
                 <center>\
-                  <b>Super pre-alpha version.</b> Ping <b>Ilses#9123</b> on the ASS discord or send a PR for any issues.\
-                  <br><a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_graph_display()">toggle graph</a>\
+                  <a href="https://github.com/Ilses/gnui">gnui</a> \
+                  <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_graph_display()">toggle graph</a>\
+                  <div id="gnui-helpers"></div>\
                   <!--<br>Crystal ball background demo: <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.set_demo_crystal_ball_pref()">Set orb preference</a> <b>or</b> <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.clear_crystal_ball_pref()">clear orb preference</a>!-->\
                 </center>\
               </td>\

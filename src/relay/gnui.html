@@ -12,7 +12,7 @@
 <!-- cytoscape, jquery --!>
 <script src="https://unpkg.com/cytoscape"></script>
 <script src="https://unpkg.com/jquery"></script>
-  
+
 <!-- cytoscape klay -->
 <script src="https://unpkg.com/klayjs"></script>
 <script src="https://unpkg.com/cytoscape-klay"></script>
@@ -57,10 +57,40 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 <div id="cy" hidden></div>
 <script>
 
+function call_script(scriptName) {
+ cli_execute("cli_execute(\'call "+scriptName+"\')")
+}
+
+// Add quick links to Thoth's helper scripts. We get the names by asking github because don't worry about it.
+$.ajax({
+  dataType: "json",
+  url: "https://api.github.com/repositories/437651675/contents/KoLmafia/scripts/thoth19_scripts_public",
+  success: (result) => {
+    var thothScriptNames = Array()
+    for (i=0; i<result.length; +i++) {
+      thothScriptNames.push(result[i].name);
+    }
+    var s=""
+    for (const e of thothScriptNames) {
+      //console.log("Found helper script: "+e);
+      s+="<a href=# onclick='document.getElementById(\"gnui\").contentWindow.call_script(\""+e+"\")'>"+e+"</a> "
+    }
+    $(window.parent.document.getElementById('gnui-helpers')).html(s)
+  }
+})
+
+// TODO:
+// checkpoint and restore equipment for some annoying common swaps
+// e.g.: checkpoint; outfit checkpoint
+//  - Put stillsuit on the cubeling, then switch back
+//  - Wear +xp scrapbook for cleaver encounter, then swap back
+//  - +xp for food, then swap back
+// Free fights like cmg don't progress some stuff, etc etc
+
 // If we hit the map icon but are still in a combat/noncom, buggy formatting happens. Check to avoid that.
 var is_main_page = $(window.parent.document.getElementsByTagName('td')).filter('[bgcolor="blue"]').text() === "The Kingdom of Loathing"
 if (is_main_page) {
-  console.log($('div[id="gnui-debug"').attr('hidden', false))
+  $('div[id="gnui-debug"').attr('hidden', false)
   $(document.getElementById('cy')).attr('hidden', false)
   update_graph_visibility()
 }
@@ -117,7 +147,7 @@ function global_invert_images(images_inverted) {
   //cy.$('node').style('filter', 'invert('+val+')')
   images_inverted = !images_inverted
 }
- 
+
 // TODO: Mafia has is_dark_mode, is there a relay equivalent?
 function set_solarized_stylesheet(response) {
   if (response == 'true') {
@@ -283,9 +313,9 @@ function QuestStateConvertQuestPropertyValueToNumber(property_value) {
     //lazy:
     //one revision had a bug that set questL11Worship to "step 4", so remove spaces
     var step_value = parseInt(property_value.replace(" ", "").replace("step", ""));
-    
+
     result = step_value + 1;
-    
+
     return (result < 0 ? 0 : result)
   }
   //unknown
@@ -856,7 +886,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "Throne Room"]')
       }
     }),
-    
+
     cli_execute("item_amount($item[dodecagram]) > 0").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Dark Neck of the Woods"]')
@@ -906,7 +936,7 @@ async function parallel_prune_graph() {
     cli_execute("get_property('questL07Cyrptic') == 'finished'").then(response => {
       cy.remove('node[name = "Haert of the Cyrpt"]')
     }),
-    
+
     cli_execute("get_property('questL08Trapper')").then(response => {
       if (questPropertyPastInternalStepNumber(response, 1)) {
         cy.remove('node[name = "The Goatlet"]')
@@ -933,7 +963,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "Mist-Shrouded Peak"]')
       }
     }),
-    
+
     cli_execute("get_property('questL09Topping')").then(response => {
       if (questPropertyPastInternalStepNumber(response, 2)) {
         cy.remove('node[name = "The Smut Orc Logging Camp"]')
@@ -956,7 +986,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "Oil Peak"]')
       }
     }),
-    
+
 
     // TODO: Probably clean up this logic with the degree functions @ https://js.cytoscape.org/#node.degree
     // If we have the bean or the airship unlock, don't need beanbat to airship edge.
@@ -976,25 +1006,25 @@ async function parallel_prune_graph() {
         }
       }
     }),
-    
+
     cli_execute("item_amount($item[S.O.C.K.]) > 0").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Penultimate Fantasy Airship"]')
       }
     }),
-    
+
     cli_execute("get_property('lastCastleGroundUnlock') >= get_property('knownAscensions')").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Castle in the Clouds in the Sky (Basement)"]')
       }
     }),
-    
+
     cli_execute("get_property('lastCastleTopUnlock') >= get_property('knownAscensions')").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Castle in the Clouds in the Sky (Ground Floor)"]')
       }
     }),
-    
+
     // It's possible to skip HitS, so all of this should be made more robust at some point.
     // For now, assume we always finish the giants quest before unlocking the hole in the sky.
     // Later, we should check the giant quest (questL10Garbage) is be finished.
@@ -1068,13 +1098,13 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "Visiting Dr. Awkward\'s office"]')
       }
     }),
-    
+
     cli_execute("get_property('questL11Worship')").then(response => {
       if (questPropertyPastInternalStepNumber(response, 4)) {
         cy.remove('node[name = "The Hidden Temple"]')
       }
     }),
-    
+
     cli_execute("get_property('hiddenApartmentProgress') > 0").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "An Overgrown Shrine (Northwest)"]')
@@ -1095,7 +1125,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "An Overgrown Shrine (Northeast)"]')
       }
     }),
-    
+
     cli_execute("get_property('hiddenApartmentProgress') >= 8").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Hidden Apartment Building"]')
@@ -1136,7 +1166,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "The Haunted Billiards Room"]')
       }
     }),
-    
+
     cli_execute("(get_property('lastSecondFloorUnlock') >= get_property('knownAscensions')) ? get_property('questM21Dance') : 'unstarted'").then(response => {
       if (questPropertyPastInternalStepNumber(response, 2)) {
         cy.remove('node[name = "The Haunted Library"]')
@@ -1148,13 +1178,13 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "The Haunted Gallery"]')
       }
     }),
-    
+
     cli_execute("item_amount($item[Lady Spookyraven's finest gown]) > 0 ? 'finished' : get_property('questM21Dance')").then(response => {
       if (questPropertyPastInternalStepNumber(response, 3)) {
         cy.remove('node[name = "The Haunted Bedroom"]')
       }
     }),
-    
+
     cli_execute("item_amount($item[Lady Spookyraven's powder puff]) > 0 ? 'finished' : get_property('questM21Dance')").then(response => {
       if (questPropertyPastInternalStepNumber(response, 3)) {
         cy.remove('node[name = "The Haunted Bathroom"]')
@@ -1191,7 +1221,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "Summoning Chamber"]')
       }
     }),
- 
+
     cli_execute("get_property('desertExploration') >= 100").then(response => {
       if (response == 'true') {
         cy.remove('node[name = "The Arid, Extra-Dry Desert"]')
@@ -1215,7 +1245,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "The Lower Chambers"]')
       }
     }),
-    
+
 
     cli_execute("item_amount($item[molybdenum magnet]) > 0 || get_property('sidequestJunkyardCompleted') != 'none'").then(response => {
       if (response == 'true') {
@@ -1266,7 +1296,7 @@ async function parallel_prune_graph() {
       if (response == 'true') {
         cy.remove('node[name = "<Rock band flyers>"]')
       }
-    }), 
+    }),
 
     cli_execute("get_property('sidequestOrchardCompleted') != 'none' || have_effect($effect[Filthworm Larva Stench]) > 0 || have_effect($effect[Filthworm Drone Stench]) > 0 || have_effect($effect[Filthworm Guard Stench]) > 0 || item_amount($item[filthworm hatchling scent gland]) > 0 || item_amount($item[filthworm drone scent gland]) > 0 || item_amount($item[filthworm royal guard scent gland]) > 0").then(response => {
       if (response == 'true') {
@@ -1311,7 +1341,7 @@ async function parallel_prune_graph() {
         cy.remove('node[name = "The Themthar Hills"]')
       }
     }),
-    
+
     // TODO: Level 13 quest.
     // "some string".contains_string("str")
     //cli_execute("get_property('nsTowerDoorKeysUsed')").then(response => {
