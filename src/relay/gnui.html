@@ -92,6 +92,7 @@ var is_main_page = $(window.parent.document.getElementsByTagName('td')).filter('
 if (is_main_page) {
   $(document.getElementById('cy')).attr('hidden', false)
   update_graph_visibility()
+  update_chat_visibility()
 }
 
 // Apply our style choices everywhere (except ChiT and guide).
@@ -229,15 +230,33 @@ function clear_crystal_ball_pref() {
    }).then(response => display_crystal_ball_predictions())
 }
 
-// Toggle graph display.
 function toggle_graph_display() {
   cli_execute("set_property('gnui.enable', !to_boolean(get_property('gnui.enable')))").then(response => {
     update_graph_visibility()
   })
 }
 
+function toggle_chat_display() {
+  cli_execute("set_property('gnui.enable_chat', !to_boolean(get_property('gnui.enable_chat')))").then(response => {
+    update_chat_visibility()
+  })
+}
+
+function update_chat_visibility() {
+  if (!is_main_page) {
+    return
+  }
+  cli_execute("get_property('gnui.enable_chat')").then(response => {
+    if (response == 'true') {
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui-chat').hidden=false
+    }
+    else {
+      window.parent.parent.frames["mainpane"].document.getElementById('gnui-chat').hidden=true
+    }
+  })
+}
+
 var graph_constructed = false;
-// TODO: Consider hiding the iframe instead of resizing, so we don't need to reflow the graph.
 function update_graph_visibility() {
   if (!is_main_page) {
     return
