@@ -12,7 +12,7 @@ buffer modifyPage(buffer source) {
                   <a href="https://github.com/Ilses/gnui">gnui</a> \
                   <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_graph_display()">graph</a>\
                   <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_chat_display()">chat</a>\
-                  <iframe id="gnui-chat", src="mchat.php", width="100%", height="40%"></iframe>\
+                  <iframe id="gnui-chat", src="mchat.php", width="100%", height="40%" hidden></iframe>\
                   <div id="gnui-helpers"></div>\
                   <!--<br>Crystal ball background demo: <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.set_demo_crystal_ball_pref()">Set orb preference</a> <b>or</b> <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.clear_crystal_ball_pref()">clear orb preference</a>!-->\
                 </center>\

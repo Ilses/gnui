@@ -41,7 +41,7 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 --!>
 <!-- <a href=# class="clilink">"maximize adventures"</a> --!>
 
-<body>
+<body onload=main_stuff()>
 <style>
    #cy {
     width: 100%;
@@ -78,9 +78,6 @@ function setMenuSize(px) {
   getMainSet().rows=String(px)+',*'
 }
 
-// Expand the topmenu pane a little bit from the default
-setMenuSize(100)
-
 function call_script(scriptName) {
  cli_execute("cli_execute(\'call "+scriptName+"\')")
 }
@@ -112,11 +109,13 @@ $.ajax({
 // Free fights like cmg don't progress some stuff, etc etc
 
 // Kick off main logic.
-$(document.getElementById('cy')).attr('hidden', false)
-//reflow_graph()
-//cy.style().update()
-update_graph_visibility()
-update_chat_visibility()
+function main_stuff() {
+  $(document.getElementById('cy')).attr('hidden', false)
+  update_graph_visibility()
+  update_chat_visibility()
+  // Expand the topmenu pane a little bit from the default
+  setMenuSize(100)
+}
 
 // Apply our style choices everywhere (except ChiT and guide).
 var tourguide_found = false
@@ -281,15 +280,15 @@ var graph_added_px = 0;
 function update_graph_visibility() {
   cli_execute("get_property('gnui.enable')").then(response => {
     if (response == 'true') {
+      getParentFrame().document.getElementById('gnui').hidden=false
+      graph_added_px = 800;
+      setMenuSize(getMenuSize() + graph_added_px)
       if (!graph_constructed) {
         construct_graph().then(() => { parallel_prune_graph(); graph_constructed = true; })
       }
-      graph_added_px = 800;
-      setMenuSize(getMenuSize() + graph_added_px)
-      getParentFrame().document.getElementById('gnui').hidden=false
     } else {
-      getParentFrame().document.getElementById('gnui').hidden=true
       setMenuSize(getMenuSize() - graph_added_px)
+      getParentFrame().document.getElementById('gnui').hidden=true
     }
   }).then(response => { $('div[id="gnui-debug"').attr('hidden', false); reflow_graph() })
 }
