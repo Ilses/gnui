@@ -1,8 +1,9 @@
 buffer modifyPage(buffer source) {
   // Add a toggle for our interface to the world map page.
-  source.replace_string('<body', '\
+  source.replace_string('<div id="awesome"', '\
+  <br><br>\
   <div id="gnui-text" style="display: block;"><center>\
-    <table width="95%" cellspacing="0" cellpadding="0"><tbody> <tr>\
+    <table width="100%" cellspacing="30" cellpadding="0"><tbody> <tr>\
         <td style="padding: 5px; border: 1px solid white;"><center>\
           <table><tbody>\
             <tr>\
@@ -11,7 +12,7 @@ buffer modifyPage(buffer source) {
                   <a href="https://github.com/Ilses/gnui">gnui</a> \
                   <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_graph_display()">graph</a>\
                   <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.toggle_chat_display()">chat</a>\
-                  <iframe id="gnui-chat", src="mchat.php", width="95%", height="40%"></iframe>\
+                  <iframe id="gnui-chat", src="mchat.php", width="100%", height="40%"></iframe>\
                   <div id="gnui-helpers"></div>\
                   <!--<br>Crystal ball background demo: <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.set_demo_crystal_ball_pref()">Set orb preference</a> <b>or</b> <a href=# onclick="window.document.getElementById(\'gnui\').contentWindow.clear_crystal_ball_pref()">clear orb preference</a>!-->\
                 </center>\
@@ -23,10 +24,9 @@ buffer modifyPage(buffer source) {
     </tbody>\
   </table>\
   </center></div>\
-  \n<body');
-  
-  // Add the iframe with all the logic.
-  source.replace_string('<body', '\n<center><iframe id="gnui", src="gnui.html", width="95%", height="80%" hidden=true></iframe></center>\n<body');
+  <!-- // Add the iframe with all the logic --!>\
+  <center><iframe id="gnui", src="gnui.html", width="99%", height="800" hidden=true></iframe>\
+  <div id="awesome"');
 
   return source;
 }

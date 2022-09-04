@@ -41,7 +41,6 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 --!>
 <!-- <a href=# class="clilink">"maximize adventures"</a> --!>
 
-<br>
 <body>
 <style>
    #cy {
@@ -56,6 +55,31 @@ Debug commands: <a href=# onclick="reflow_graph(); return false">reflow graph</a
 
 <div id="cy" hidden></div>
 <script>
+
+function getParentFrame() {
+  return window.parent.parent.frames["menupane"]
+}
+
+function getMainSet() {
+  return window.parent.parent.frames['mainset']
+}
+
+function getMainPane() {
+  return window.parent.parent.frames['mainpane']
+}
+console.log("mainpane: ")
+console.log(getMainPane())
+
+function getMenuSize() {
+ return parseInt(getMainSet().rows.split(',')[0])
+}
+
+function setMenuSize(px) {
+  getMainSet().rows=String(px)+',*'
+}
+
+// Expand the topmenu pane a little bit from the default
+setMenuSize(100)
 
 function call_script(scriptName) {
  cli_execute("cli_execute(\'call "+scriptName+"\')")
@@ -87,13 +111,12 @@ $.ajax({
 //  - +xp for food, then swap back
 // Free fights like cmg don't progress some stuff, etc etc
 
-// If we hit the map icon but are still in a combat/noncom, buggy formatting happens. Check to avoid that.
-var is_main_page = $(window.parent.document.getElementsByTagName('td')).filter('[bgcolor="blue"]').text() === "The Kingdom of Loathing"
-if (is_main_page) {
-  $(document.getElementById('cy')).attr('hidden', false)
-  update_graph_visibility()
-  update_chat_visibility()
-}
+// Kick off main logic.
+$(document.getElementById('cy')).attr('hidden', false)
+//reflow_graph()
+//cy.style().update()
+update_graph_visibility()
+update_chat_visibility()
 
 // Apply our style choices everywhere (except ChiT and guide).
 var tourguide_found = false
@@ -153,17 +176,13 @@ function set_solarized_stylesheet(response) {
   if (response == 'true') {
     document.querySelector("#solarized-light-css").setAttribute('disabled', true);
     document.querySelector("#solarized-dark-css").removeAttribute('disabled');
-    if (is_main_page) {
-      global_apply_style("solarized-dark.css")
-    }
+    global_apply_style("solarized-dark.css")
     cy.$('node').data('class', 'dark')
     global_invert_images(true)
   } else {
     document.querySelector("#solarized-dark-css").setAttribute('disabled', true);
     document.querySelector("#solarized-light-css").removeAttribute('disabled');
-    if (is_main_page) {
-      global_apply_style("solarized-light.css")
-    }
+    global_apply_style("solarized-light.css")
     cy.$('node').data('class', 'light')
     global_invert_images(false)
   }
@@ -242,33 +261,35 @@ function toggle_chat_display() {
   })
 }
 
+var chat_added_px = 0;
 function update_chat_visibility() {
-  if (!is_main_page) {
-    return
-  }
   cli_execute("get_property('gnui.enable_chat')").then(response => {
     if (response == 'true') {
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui-chat').hidden=false
+      getParentFrame().document.getElementById('gnui-chat').hidden=false
+      chat_added_px = 160;
+      setMenuSize(getMenuSize() + chat_added_px)
     }
     else {
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui-chat').hidden=true
+      getParentFrame().document.getElementById('gnui-chat').hidden=true
+      setMenuSize(getMenuSize() - chat_added_px)
     }
   })
 }
 
 var graph_constructed = false;
+var graph_added_px = 0;
 function update_graph_visibility() {
-  if (!is_main_page) {
-    return
-  }
   cli_execute("get_property('gnui.enable')").then(response => {
     if (response == 'true') {
       if (!graph_constructed) {
         construct_graph().then(() => { parallel_prune_graph(); graph_constructed = true; })
       }
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui').hidden=false
+      graph_added_px = 800;
+      setMenuSize(getMenuSize() + graph_added_px)
+      getParentFrame().document.getElementById('gnui').hidden=false
     } else {
-      window.parent.parent.frames["mainpane"].document.getElementById('gnui').hidden=true
+      getParentFrame().document.getElementById('gnui').hidden=true
+      setMenuSize(getMenuSize() - graph_added_px)
     }
   }).then(response => { $('div[id="gnui-debug"').attr('hidden', false); reflow_graph() })
 }
